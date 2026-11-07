@@ -1,3 +1,5 @@
+> **Windows:** baixe o instalador `.exe` na [página de Releases](https://github.com/3squeleeet/Market-Lab/releases/latest). O botão "Code → Download ZIP" baixa o código-fonte.
+
 # Market Lab 0.1.0
 
 Laboratório desktop de mercado cripto inteiramente sintético. Sem carteiras, corretoras ou dinheiro real. Interface em português.
@@ -24,7 +26,7 @@ npm run build
 npm start
 ```
 
-Validação: `npm test`. `npm run build` verifica TypeScript e gera frontend e processo principal. O projeto ainda não gera instaladores distribuíveis.
+Validação: `npm test`. `npm run build` verifica TypeScript e gera frontend e processo principal. Para gerar o instalador Windows x64, execute `npm run dist:win`. O arquivo `.exe` fica em `release/`. O instalador é por usuário e permite escolher o diretório de instalação. Não requer Node.js na máquina de destino.
 
 ## Implementado
 
@@ -59,7 +61,7 @@ As três posições são exemplos fixos e identificados como demonstração. Nã
 
 O histórico em memória tem 7.200 candles de 1 segundo por ativo (até duas horas); intervalos longos terão poucas barras. Dados OHLCV intrassegundo são aproximações estocásticas, não um livro de ofertas. A correlação é um fator de risco simplificado, sem calibração empírica. O motor não é um modelo validado para inferência sobre mercados reais.
 
-O motor executa no renderer nesta fundação. A restauração reproduz os ticks de forma síncrona e pode demorar em sessões extensas. O último intervalo de até 5 segundos pode ser perdido ao encerrar abruptamente. Snapshots têm schema preparado, mas ainda não são escritos; o checkpoint salvo contém seed/configuração/ticks. Não há migrações versionadas, compactação de histórico, exportação de pesquisa, autenticação ou instaladores assinados.
+O motor executa no renderer nesta fundação. A restauração reproduz os ticks de forma síncrona e pode demorar em sessões extensas. O último intervalo de até 5 segundos pode ser perdido ao encerrar abruptamente. Snapshots têm schema preparado, mas ainda não são escritos; o checkpoint salvo contém seed/configuração/ticks. Não há migrações versionadas, compactação de histórico, exportação de pesquisa, autenticação ou assinatura digital do instalador.
 
 ## Próximo marco recomendado — 0.2
 

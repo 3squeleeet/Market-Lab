@@ -11,4 +11,8 @@ Para executar o Electron dentro do executor cloud restrito, o teste utilizou `--
 
 A versão inicial do binário Electron falhou ao criar uma janela, inclusive em um exemplo mínimo. A atualização para a versão 45.2.3 resolveu a falha. Um erro de fechamento antecipado do banco também foi corrigido, movendo o encerramento para `will-quit`.
 
-Não foram criados instaladores, certificados de assinatura, conexão MCP, agentes nem execução de ordens. Consulte README.md para arquitetura, execução e limites do modelo sintético.
+A validação inicial não incluía instaladores. A distribuição Windows foi adicionada posteriormente, conforme a seção abaixo. Não há certificados de assinatura, conexão MCP, agentes nem execução de ordens. Consulte README.md para arquitetura, execução e limites do modelo sintético.
+
+## Distribuição Windows
+
+Configuração NSIS x64 adicionada com electron-builder. `npm run dist:win` gera `release/Market-Lab-0.1.0-Setup-x64.exe`, com Electron incluído, instalação por usuário e escolha de diretório. O instalador ainda não tem assinatura digital. A execução nativa no Windows ainda não foi verificada neste executor Linux.

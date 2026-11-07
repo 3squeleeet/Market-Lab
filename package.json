@@ -16,7 +16,9 @@
     "test": "vitest run",
     "test:browser": "node scripts/check-browser.mjs",
     "format": "prettier --write src packages electron scripts",
-    "test:desktop": "node scripts/check-desktop.mjs"
+    "test:desktop": "node scripts/check-desktop.mjs",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.0",
@@ -37,11 +39,51 @@
     "@vitejs/plugin-react": "^4.4.0",
     "concurrently": "^9.1.0",
     "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.8.0",
     "vite": "^6.1.0",
     "vitest": "^3.0.0",
     "wait-on": "^8.0.0"
+  },
+  "description": "Laboratório de simulação de mercados de criptomoedas",
+  "author": "Market Lab contributors",
+  "license": "MIT",
+  "build": {
+    "appId": "io.marketlab.desktop",
+    "productName": "Market Lab",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "Market-Lab-${version}-Setup-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Market Lab",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    }
   }
 }
