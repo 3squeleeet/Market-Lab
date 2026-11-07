@@ -124,25 +124,28 @@ try {
   await page
     .getByRole("heading", { name: "Experimentos salvos", exact: true })
     .waitFor();
-  // Teste STDIO usando o próprio executável Electron, incluindo o modo --mcp distribuído.
+  // Teste STDIO usando o próprio executável Electron, usando o runtime Node embutido e o servidor distribuído.
   view = (await page.evaluate(() => window.marketLab.view())).data;
   const config = view.mcp.configuration.mcpServers["market-lab"];
   const transport = new StdioClientTransport({
     command: config.command,
-    args: [...config.args, ...extra],
+    args: config.args,
     stderr: "pipe",
-    env: Object.fromEntries(
-      [
-        "XDG_CACHE_HOME",
-        "XDG_CONFIG_HOME",
-        "DISPLAY",
-        "DBUS_SESSION_BUS_ADDRESS",
-        "GSETTINGS_BACKEND",
-        "NO_AT_BRIDGE",
-      ]
-        .filter((k) => process.env[k])
-        .map((k) => [k, process.env[k]]),
-    ),
+    env: {
+      ...config.env,
+      ...Object.fromEntries(
+        [
+          "XDG_CACHE_HOME",
+          "XDG_CONFIG_HOME",
+          "DISPLAY",
+          "DBUS_SESSION_BUS_ADDRESS",
+          "GSETTINGS_BACKEND",
+          "NO_AT_BRIDGE",
+        ]
+          .filter((k) => process.env[k])
+          .map((k) => [k, process.env[k]]),
+      ),
+    },
   });
   if (process.env.DEBUG_MCP)
     transport.stderr?.on("data", (d) => process.stderr.write(d));

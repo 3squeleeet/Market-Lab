@@ -48,6 +48,7 @@ export async function startBridge(
   directory: string,
   command: string,
   args: string[],
+  env?: Record<string, string>,
 ) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const configPath = path.join(directory, "mcp-instance.json"),
@@ -73,15 +74,21 @@ export async function startBridge(
       configPath,
       configuration: {
         mcpServers: {
-          "market-lab": { command, args: [...args, "--discovery", configPath] },
+          "market-lab": {
+            command,
+            args: [...args, "--discovery", configPath],
+            ...(env ? { env } : {}),
+          },
         },
       },
       logs: [...logs],
     };
   };
   const server = net.createServer((socket) => {
+    socket.setEncoding("utf8");
     let data = "",
       processed = false;
+    socket.setEncoding("utf8");
     socket.setTimeout(15000, () => socket.destroy());
     socket.on("error", () => {});
     socket.on("data", (chunk) => {
@@ -201,6 +208,7 @@ export async function bridgeRequest(
           "\n",
       ),
     );
+    socket.setEncoding("utf8");
     socket.setTimeout(15000, () =>
       finish({
         ok: false,

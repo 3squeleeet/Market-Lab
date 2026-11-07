@@ -4,7 +4,7 @@
 
 1. Instale `Market-Lab-0.2.0-Setup-x64.exe` ou extraia o ZIP completo em uma pasta fixa. No ZIP, o executável é `Market Lab.exe`, ao lado da pasta `resources`.
 2. Abra o Market Lab e a página **Conexões MCP**.
-3. Copie o JSON completo gerado pelo aplicativo. `command` usa o caminho absoluto real do executável em execução; os argumentos incluem `--mcp`, `--discovery` e o arquivo real de descoberta dessa instalação. Não há caminhos fictícios que você precise adivinhar.
+3. Copie o JSON completo gerado pelo aplicativo. `command` usa o caminho absoluto real do executável em execução; os argumentos incluem o servidor empacotado, `--discovery` e o arquivo real de descoberta dessa instalação. O bloco `env` ativa o runtime Node já incluído no Electron. Não há caminhos fictícios que você precise adivinhar.
 4. Deixe o Market Lab aberto enquanto usa as ferramentas.
 
 A versão portátil autoextraível pode ter `process.execPath` temporário. Para uma configuração permanente use instalador/ZIP e copie novamente o JSON depois de mover ou reinstalar o aplicativo.
@@ -22,17 +22,22 @@ O JSON gerado contém esta estrutura, com valores reais preenchidos pelo aplicat
   "mcpServers": {
     "market-lab": {
       "command": "CAMINHO_ABSOLUTO_REAL_GERADO_NO_PAINEL",
-      "args": ["--mcp", "--discovery", "ARQUIVO_REAL_GERADO_NO_PAINEL"]
+      "args": [
+        "SERVIDOR_CJS_REAL_GERADO_NO_PAINEL",
+        "--discovery",
+        "ARQUIVO_REAL_GERADO_NO_PAINEL"
+      ],
+      "env": { "ELECTRON_RUN_AS_NODE": "1" }
     }
   }
 }
 ```
 
-Os dois valores acima são marcadores explicativos, **não uma configuração pronta para colar**. A configuração pronta fica no painel e usa os caminhos reais da máquina. O executável faz o papel de servidor STDIO; não é preciso iniciar outro serviço, instalar Node.js ou abrir uma porta.
+Os valores em maiúsculas acima são marcadores explicativos, **não uma configuração pronta para colar**. A configuração pronta fica no painel e usa os caminhos reais da máquina. O executável faz o papel de servidor STDIO; não é preciso iniciar outro serviço, instalar Node.js ou abrir uma porta.
 
 ## Claude Code
 
-Use `claude mcp add-json market-lab` e, como argumento JSON, o objeto interno `market-lab` copiado do painel (contendo `command` e `args`). Em PowerShell ou Bash, envolva o JSON com aspas simples; se o caminho contiver apóstrofos, ajuste o escape para seu shell. Consulte a conexão com `claude mcp list`.
+Use `claude mcp add-json market-lab` e, como argumento JSON, o objeto interno `market-lab` copiado do painel (contendo `command`, `args` e `env`). Em PowerShell ou Bash, envolva o JSON com aspas simples; se o caminho contiver apóstrofos, ajuste o escape para seu shell. Consulte a conexão com `claude mcp list`.
 
 Depois peça, por exemplo:
 
@@ -88,3 +93,7 @@ O MCP cria/usa `external` com US$100.000 virtuais e só pode acessar essa conta 
 Stops/targets aceitam `price` absoluto ou `percent` da entrada, sem os dois simultaneamente. `price: null` remove a proteção. Operações são spot long-only. Ordens limitadas reservam capital/inventário e respeitam seu preço limite.
 
 O servidor usa o SDK oficial `@modelcontextprotocol/sdk`. Foram testados negociação/listagem/chamada de ferramentas por STDIO, validação, conta isolada, estado real, reconexão e indisponibilidade; a configuração do Claude do usuário deve ser feita no próprio computador.
+
+## Processo sem janela
+
+A distribuição contém `resources/mcp/server.cjs`, com SDK e dependências empacotados. O JSON usa o próprio `Market Lab.exe` com `ELECTRON_RUN_AS_NODE=1` para executar esse servidor sem janela e sem depender de um Node instalado. O aplicativo gráfico continua como único proprietário dos motores e do banco. Não remova o bloco `env` da configuração.

@@ -7,3 +7,4 @@ work/
 output/
 release/
 **/mcp-instance.json
+dist-mcp/

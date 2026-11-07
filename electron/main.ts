@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { openDatabase } from "../packages/database/src/index.js";
 import { LabService } from "../packages/core/src/index.js";
@@ -12,21 +13,7 @@ import { SYMBOLS, type Symbol } from "../packages/shared/src/index.js";
 import { assertJSON } from "../packages/shared/src/validation.js";
 import { SimulationClock } from "../packages/time-controller/src/index.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
-if (process.argv.includes("--mcp")) {
-  const index = process.argv.indexOf("--discovery");
-  const discovery = process.argv[index + 1];
-  if (index < 0 || !discovery) {
-    process.stderr.write("Use a configuração exibida em Conexões MCP.\n");
-    app.exit(1);
-  } else {
-    await import("../packages/mcp-server/src/index.js")
-      .then((m) => m.startMCP(discovery))
-      .catch((e) => {
-        process.stderr.write(String(e));
-        app.exit(1);
-      });
-  }
-} else if (!app.requestSingleInstanceLock()) {
+if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   let service: LabService;
@@ -99,12 +86,20 @@ if (process.argv.includes("--mcp")) {
       const directory = app.getPath("userData");
       db = await openDatabase(path.join(directory, "market-lab.sqlite"));
       service = new LabService(db);
-      const mcpArgs = [
-        ...(app.isPackaged ? ["--mcp"] : [app.getAppPath(), "--mcp"]),
-        ...(process.platform === "linux" ? ["--headless"] : []),
-        `--user-data-dir=${path.join(directory, "mcp-runtime")}`,
-      ];
-      bridge = await startBridge(service, directory, process.execPath, mcpArgs);
+      const mcpScript = app.isPackaged
+        ? path.join(process.resourcesPath, "mcp", "server.cjs")
+        : path.join(app.getAppPath(), "dist-mcp", "server.cjs");
+      if (!existsSync(mcpScript))
+        throw Error(
+          "Servidor MCP ausente. Execute npm run build:mcp ou reinstale o aplicativo completo.",
+        );
+      bridge = await startBridge(
+        service,
+        directory,
+        process.execPath,
+        [mcpScript],
+        { ELECTRON_RUN_AS_NODE: "1" },
+      );
       ipcMain.handle("lab:view", (e, symbol: unknown) =>
         reply(() => {
           authorized(e);

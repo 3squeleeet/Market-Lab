@@ -19,7 +19,7 @@ A compatibilidade MCP foi exercitada por cliente do SDK oficial. A instalação/
 
 ## Observações
 
-O teste visual encontrou campos select sem nome acessível exato; eles foram corrigidos com labels explícitos. O início do MCP por Electron no Linux exige modo headless sem janela; a configuração gerada inclui esse argumento quando necessário. A transferência de estado para o renderer foi reduzida: somente o ativo selecionado recebe histórico longo de candles; os outros recebem candles recentes para minigráficos, enquanto o histórico completo permanece no backend/SQLite.
+O teste visual encontrou campos select sem nome acessível exato; eles foram corrigidos com labels explícitos. O início do MCP pelo modo gráfico do Electron não respondeu ao STDIO no Windows. A configuração passou a usar o runtime Node incluído no executável e um servidor CJS externo ao ASAR, sem janela nem Node instalado separadamente. A transferência de estado para o renderer foi reduzida: somente o ativo selecionado recebe histórico longo de candles; os outros recebem candles recentes para minigráficos, enquanto o histórico completo permanece no backend/SQLite.
 
 A distribuição 0.1.0 era somente uma fundação. Consulte README.md e docs/MCP.md para escopo funcional atual e limites de execução spot, liquidez indicativa, amostragem e sessões muito extensas.
 

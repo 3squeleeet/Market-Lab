@@ -9,9 +9,9 @@
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "dev:desktop": "npm run build:electron && concurrently -k \"vite --host 0.0.0.0\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "dev:desktop": "npm run build:electron && npm run build:mcp && concurrently -k \"vite --host 0.0.0.0\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "tsc --noEmit && vite build && npm run build:electron",
+    "build": "tsc --noEmit && vite build && npm run build:electron && npm run build:mcp",
     "start": "electron .",
     "test": "npm run build:electron && vitest run",
     "test:browser": "node scripts/check-browser.mjs",
@@ -21,7 +21,8 @@
     "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never",
     "mcp": "node dist-electron/packages/mcp-server/src/cli.js",
     "dist:portable": "npm run build && electron-builder --win portable --x64 --publish never",
-    "mcp:config": "node scripts/mcp-config.mjs"
+    "mcp:config": "node scripts/mcp-config.mjs",
+    "build:mcp": "esbuild packages/mcp-server/src/cli.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist-mcp/server.cjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -45,6 +46,7 @@
     "concurrently": "^9.1.0",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
+    "esbuild": "^0.25.12",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.8.0",
@@ -104,7 +106,13 @@
     },
     "portable": {
       "artifactName": "Market-Lab-${version}-Portable-${arch}.${ext}"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "dist-mcp/server.cjs",
+        "to": "mcp/server.cjs"
+      }
+    ]
   },
   "repository": {
     "type": "git",
