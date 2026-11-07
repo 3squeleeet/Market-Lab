@@ -3,7 +3,7 @@
 ## Verificações locais
 
 - Compilação TypeScript do renderer e de todos os pacotes/backend, build Vite e Electron.
-- 29 testes em cinco arquivos: determinismo e retomada do PRNG, regimes/eventos, OHLCV, correlação, relógio, trading, reservas, taxas/slippage, entrada média, P&L líquido, cancelamentos, limites, SL/TP, idempotência, exposição, propriedade/isolamento, migrations/persistência, restauração, falha de gravação e rollback SQLite.
+- 30 testes em cinco arquivos: determinismo e retomada do PRNG, regimes/eventos, OHLCV, correlação, relógio, trading, reservas, taxas/slippage, entrada média, P&L líquido, cancelamentos, limites, SL/TP, idempotência, exposição, propriedade/isolamento, migrations/persistência, restauração, falha de gravação e rollback SQLite.
 - O teste MCP usa o SDK oficial via STDIO, lista exatamente as 33 ferramentas e chama as rotas obrigatórias de mercado, conta, ordens, risco, agentes, simulação, análises e backtest. Verifica parâmetros inválidos, conta principal inacessível pelo MCP e `UNAVAILABLE` sem instância aberta.
 - Teste Electron com dados reais de um SQLite temporário: navegação das oito páginas, gráfico, compra pela interface, ordem limitada/cancelamento, criação de agente local e execução, backtest, cliente STDIO iniciado pelo executável Electron e restauração de conta/ordens/backtest após fechar e reabrir.
 - Verificação do renderer: contextIsolation=true, nodeIntegration=false, sandbox=true e ausência de `window.require`.
@@ -22,3 +22,5 @@ A compatibilidade MCP foi exercitada por cliente do SDK oficial. A instalação/
 O teste visual encontrou campos select sem nome acessível exato; eles foram corrigidos com labels explícitos. O início do MCP por Electron no Linux exige modo headless sem janela; a configuração gerada inclui esse argumento quando necessário. A transferência de estado para o renderer foi reduzida: somente o ativo selecionado recebe histórico longo de candles; os outros recebem candles recentes para minigráficos, enquanto o histórico completo permanece no backend/SQLite.
 
 A distribuição 0.1.0 era somente uma fundação. Consulte README.md e docs/MCP.md para escopo funcional atual e limites de execução spot, liquidez indicativa, amostragem e sessões muito extensas.
+
+O primeiro ciclo Windows detectou um escape incorreto no endereço do named pipe. O formato foi corrigido com String.raw e passou a ter um teste de prefixo Windows executado também no Linux.

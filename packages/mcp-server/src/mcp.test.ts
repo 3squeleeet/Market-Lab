@@ -6,7 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { openDatabase } from "../../database/src/index";
 import { LabService } from "../../core/src/index";
-import { startBridge, bridgeRequest } from "./bridge";
+import { startBridge, bridgeRequest, bridgeEndpoint } from "./bridge";
 import { MCP_TOOLS } from "../../shared/src/commands";
 it("SDK oficial negocia STDIO, valida ferramentas e opera o estado real da instância", async () => {
   const dir = mkdtempSync(join(tmpdir(), "lab-mcp-"));
@@ -172,4 +172,12 @@ it("servidor STDIO permanece honesto quando o aplicativo está fechado", async (
   } finally {
     await client.close();
   }
+});
+
+it("monta named pipe Windows válido mesmo quando o teste roda em Unix", () => {
+  const endpoint = bridgeEndpoint("/profile", 123, "win32");
+  expect([...Buffer.from(endpoint.slice(0, 9))]).toEqual([
+    92, 92, 46, 92, 112, 105, 112, 101, 92,
+  ]);
+  expect(endpoint).toMatch(/market-lab-[a-f0-9]{12}-123$/);
 });

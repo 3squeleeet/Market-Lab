@@ -30,6 +30,19 @@ const requestSchema = z
     args: z.unknown().optional(),
   })
   .strict();
+export function bridgeEndpoint(
+  directory: string,
+  pid = process.pid,
+  platform: NodeJS.Platform = process.platform,
+) {
+  const hash = createHash("sha256")
+    .update(directory)
+    .digest("hex")
+    .slice(0, 12);
+  return platform === "win32"
+    ? String.raw`\\.\pipe\market-lab-${hash}-${pid}`
+    : path.join(os.tmpdir(), `ml-${hash}-${pid}.sock`);
+}
 export async function startBridge(
   service: LabService,
   directory: string,
@@ -39,11 +52,7 @@ export async function startBridge(
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const configPath = path.join(directory, "mcp-instance.json"),
     token = randomBytes(32).toString("hex"),
-    hash = createHash("sha256").update(directory).digest("hex").slice(0, 12),
-    endpoint =
-      process.platform === "win32"
-        ? `\\.\pipe\market-lab-${hash}-${process.pid}`
-        : path.join(os.tmpdir(), `ml-${hash}-${process.pid}.sock`);
+    endpoint = bridgeEndpoint(directory);
   const clients = new Map<string, number>();
   const logs: { time: number; message: string }[] = [];
   const log = (message: string) => {
