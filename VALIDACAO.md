@@ -15,4 +15,6 @@ A validação inicial não incluía instaladores. A distribuição Windows foi a
 
 ## Distribuição Windows
 
-Configuração NSIS x64 adicionada com electron-builder. `npm run dist:win` gera `release/Market-Lab-0.1.0-Setup-x64.exe`, com Electron incluído, instalação por usuário e escolha de diretório. O instalador ainda não tem assinatura digital. A execução nativa no Windows ainda não foi verificada neste executor Linux.
+Configuração portátil x64 adicionada com electron-builder. `npm run dist:win` gera `release/Market-Lab-0.1.0-Windows-x64.exe`, com Electron incluído, sem exigir instalação ou Node.js no destino. O executável ainda não tem assinatura digital. A execução nativa no Windows ainda não foi verificada neste executor Linux.
+
+O arquivo ASAR destinado ao Windows foi inspecionado: frontend, processo principal, preload e SQLite WASM estão presentes. O mesmo ASAR passou no teste de integração usando Electron Linux: isolamento, controles, IPC, persistência e reinício. Isso não substitui a verificação nativa no Windows.

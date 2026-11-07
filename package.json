@@ -17,7 +17,7 @@
     "test:browser": "node scripts/check-browser.mjs",
     "format": "prettier --write src packages electron scripts",
     "test:desktop": "node scripts/check-desktop.mjs",
-    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never",
     "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never"
   },
   "dependencies": {
@@ -66,24 +66,18 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": [
             "x64"
           ]
         }
       ],
       "signAndEditExecutable": false,
-      "artifactName": "Market-Lab-${version}-Setup-${arch}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Market Lab",
-      "deleteAppDataOnUninstall": false,
-      "runAfterFinish": true
+      "artifactName": "Market-Lab-${version}-Windows-${arch}.${ext}"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3squeleeet/Market-Lab.git"
   }
 }
