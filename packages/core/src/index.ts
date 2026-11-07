@@ -10,6 +10,7 @@ import type {
   EventKind,
   Quote,
   MarketState,
+  Candle,
 } from "../../shared/src/index.js";
 import { SYMBOLS } from "../../shared/src/index.js";
 import {
@@ -73,6 +74,7 @@ export class LabService {
   trading: TradingEngine;
   state: LabState;
   mcpStatus: MCPStatus | null = null;
+  private pendingCandles: { symbol: Symbol; candle: Candle }[] = [];
   constructor(public repository: Repository) {
     const saved = repository.loadState();
     if (saved) {
@@ -134,6 +136,7 @@ export class LabService {
     });
   }
   restore(s: LabState) {
+    this.pendingCandles = [];
     this.state = s;
     this.market = MarketEngine.restore(s.market);
     this.trading = new TradingEngine(s.trading);
@@ -143,7 +146,8 @@ export class LabService {
     this.state.market = this.market.snapshot();
     this.state.trading = this.trading.state;
     assertJSON(this.state);
-    this.repository.saveState(this.state);
+    this.repository.saveState(this.state, this.pendingCandles);
+    this.pendingCandles = [];
   }
   private audit(action: string, details: unknown, actor: string) {
     this.state.audit.push({
@@ -357,6 +361,10 @@ export class LabService {
             if (q.candles.length > 7200) q.candles.shift();
           }
         } else this.market.step();
+        for (const q of this.market.quotes) {
+          const candle = q.candles.at(-1);
+          if (candle) this.pendingCandles.push({ symbol: q.symbol, candle });
+        }
         this.trading.onTick(this.market.quotes, this.market.time, (id) =>
           this.exposure(id),
         );
@@ -856,6 +864,10 @@ export class LabService {
         if (!p.symbol || value! <= 0 || value! > 1e12)
           throw Error("Ativo e preço positivo obrigatórios");
         this.market.setPrice(p.symbol, value!);
+        for (const q of this.market.quotes) {
+          const candle = q.candles.at(-1);
+          if (candle) this.pendingCandles.push({ symbol: q.symbol, candle });
+        }
         this.trading.onTick(this.market.quotes, this.market.time, (id) =>
           this.exposure(id),
         );

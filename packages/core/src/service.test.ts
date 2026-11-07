@@ -227,3 +227,17 @@ describe("determinismo ampliado", () => {
     expect(a.snapshot()).toEqual(b.snapshot());
   });
 });
+
+it("avanços maiores que o buffer do gráfico não descartam candles do histórico persistido", () => {
+  lab.advance(7300);
+  const history = db.candles(
+    lab.state.sessionId,
+    "BTC/USD",
+    0,
+    Number.MAX_SAFE_INTEGER,
+    20000,
+  );
+  expect(lab.market.quotes[0].candles).toHaveLength(7200);
+  expect(history).toHaveLength(10900);
+  expect(history.every((c, i) => c.time === 1735689601 + i)).toBe(true);
+});

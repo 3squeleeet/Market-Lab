@@ -91,7 +91,10 @@ export async function openDatabase(path: string) {
       throw e;
     }
   }
-  function saveState(state: LabState) {
+  function saveState(
+    state: LabState,
+    pendingCandles: { symbol: Symbol; candle: Candle }[] = [],
+  ) {
     atomic(() => {
       db.insert(schema.checkpoints)
         .values({ id: "current", version: 2, payload: JSON.stringify(state) })
@@ -124,6 +127,18 @@ export async function openDatabase(path: string) {
         "INSERT OR IGNORE INTO candles VALUES (?,?,?,?,?,?,?,?)",
       );
       try {
+        for (const { symbol, candle: c } of pendingCandles)
+          if (c.time > (existing.get(symbol) ?? 0))
+            stmt.run([
+              sid,
+              symbol,
+              c.time,
+              c.open,
+              c.high,
+              c.low,
+              c.close,
+              c.volume,
+            ]);
         for (const q of state.market.quotes)
           for (const c of q.candles)
             if (c.time > (existing.get(q.symbol) ?? 0))
