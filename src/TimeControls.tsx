@@ -1,7 +1,9 @@
 import { Activity, Pause, Play, RotateCcw } from "lucide-react";
-import { engine, useLab, persist } from "./store";
+import { useLab, run } from "./store";
+import { date } from "./demo";
 export function TimeControls() {
-  const s = useLab();
+  const s = useLab(),
+    data = s.data!;
   return (
     <div className="time-bar">
       <span className="time-icon">
@@ -9,44 +11,55 @@ export function TimeControls() {
       </span>
       <div>
         <strong>Controle da simulação</strong>
-        <small>O tempo está nas suas mãos.</small>
+        <small>
+          {data.simulation.frozen
+            ? "Mercado congelado"
+            : "Relógio independente · ticks determinísticos"}
+        </small>
       </div>
       <button
         className="pause"
-        onClick={() => {
-          s.toggle();
-          void persist();
-        }}
+        disabled={s.pending > 0}
+        onClick={() =>
+          void run(
+            data.simulation.running ? "pause_simulation" : "resume_simulation",
+          )
+        }
       >
-        {s.running ? <Pause size={14} /> : <Play size={14} />}{" "}
-        {s.running ? "Pausar" : "Retomar"}
+        {data.simulation.running ? <Pause size={14} /> : <Play size={14} />}{" "}
+        {data.simulation.running ? "Pausar" : "Retomar"}
       </button>
       <div className="speeds">
         {[1, 2, 5, 10, 50].map((n) => (
           <button
             key={n}
-            className={s.speed === n ? "active" : ""}
-            onClick={() => s.setSpeed(n)}
+            disabled={s.pending > 0}
+            className={data.simulation.speed === n ? "active" : ""}
+            onClick={() => void run("set_simulation_speed", { speed: n })}
           >
             {n}x
           </button>
         ))}
       </div>
       <div className="sim-time">
-        <small>TEMPO SIMULADO · UTC</small>
-        <strong>
-          {new Date(engine.time * 1000)
-            .toISOString()
-            .replace("T", " ")
-            .slice(0, 19)}
-        </strong>
+        <small>TEMPO SIMULADO</small>
+        <strong>{date(data.market.time)}</strong>
       </div>
       <button
-        title="Reiniciar a mesma sessão"
+        title="Reiniciar experimento"
         className="reset"
+        disabled={s.pending > 0}
         onClick={() => {
-          s.reset(s.seed, s.volatility);
-          void persist();
+          if (
+            window.confirm(
+              "Arquivar a sessão atual e reiniciar todas as contas com a mesma seed? O histórico antigo fica no SQLite.",
+            )
+          )
+            void run("admin_intervene", {
+              confirmed: true,
+              action: "reset",
+              value: data.market.seed,
+            });
         }}
       >
         <RotateCcw size={16} />

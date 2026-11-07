@@ -31,7 +31,7 @@ export function Sidebar() {
           <FlaskConical size={23} />
         </span>
         market<span className="brand-light">lab</span>
-        <sup>0.1</sup>
+        <sup>0.2</sup>
       </a>
       <div className="workspace">
         <span className="avatar">ML</span>
@@ -50,7 +50,6 @@ export function Sidebar() {
           >
             <Icon size={18} />
             {name}
-            {name === "Agentes de IA" && <span className="soon">EM BREVE</span>}
           </button>
         ))}
       </nav>

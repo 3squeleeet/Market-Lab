@@ -9,13 +9,13 @@ import {
   type Time,
 } from "lightweight-charts";
 import { aggregate } from "../packages/market-engine/src/index";
-import { engine, useLab } from "./store";
+import { useLab } from "./store";
 export function Chart() {
   const el = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const candles = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volume = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const { symbol, interval, revision } = useLab();
+  const { symbol, interval, revision, data: state } = useLab();
   const previous = useRef("");
   useEffect(() => {
     if (!el.current) return;
@@ -64,7 +64,8 @@ export function Chart() {
     };
   }, []);
   useEffect(() => {
-    const q = engine.quotes.find((q) => q.symbol === symbol)!;
+    if (!state) return;
+    const q = state.market.quotes.find((q) => q.symbol === symbol)!;
     const data = aggregate(q.candles, interval);
     candles.current?.setData(data.map((d) => ({ ...d, time: d.time as Time })));
     volume.current?.setData(
@@ -74,7 +75,8 @@ export function Chart() {
         color: d.close >= d.open ? "#20483f" : "#4a2c35",
       })),
     );
-    const key = symbol + interval;
+    const key =
+      symbol + interval + (q.candles.length > 240 ? "full" : "recent");
     if (previous.current !== key) {
       chart.current?.timeScale().fitContent();
       previous.current = key;

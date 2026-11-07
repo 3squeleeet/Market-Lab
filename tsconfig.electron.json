@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -9,11 +9,6 @@
     "outDir": "dist-electron",
     "rootDir": "."
   },
-  "include": [
-    "electron/**/*.ts",
-    "packages/database/**/*.ts",
-    "packages/shared/**/*.ts",
-    "electron/**/*.cts"
-  ],
+  "include": ["electron/**/*.ts", "electron/**/*.cts", "packages/**/*.ts"],
   "exclude": ["**/*.test.ts"]
 }

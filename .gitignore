@@ -6,3 +6,4 @@ dist-electron/
 work/
 output/
 release/
+**/mcp-instance.json

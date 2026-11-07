@@ -1,9 +1,10 @@
 import { Activity } from "lucide-react";
-import { engine, useLab } from "./store";
+import { useLab } from "./store";
 import { Chart } from "./Chart";
 import { price } from "./demo";
 export function MarketTerminal() {
   const s = useLab();
+  const engine = s.data!.market;
   const q = engine.quotes.find((q) => q.symbol === s.symbol)!;
   const change = (q.price / q.initial - 1) * 100;
   return (
@@ -63,7 +64,7 @@ export function MarketTerminal() {
         </div>
         <Chart />
         <div className="chart-footer">
-          <span>Motor sintético · seed {s.seed}</span>
+          <span>Motor sintético · seed {s.data!.market.seed}</span>
           <span>TradingView Lightweight Charts™</span>
         </div>
       </section>
@@ -99,7 +100,8 @@ export function MarketTerminal() {
                 <svg viewBox="0 0 64 22">
                   <polyline
                     points={a.candles
-                      .filter((_, j) => j % 120 === 0)
+                      .slice(-120)
+                      .filter((_, j) => j % 6 === 0)
                       .slice(-20)
                       .map(
                         (d, j, arr) =>

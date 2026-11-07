@@ -1,20 +1,24 @@
-# Validação — Market Lab 0.1.0
+# Validação — Market Lab 0.2.0
 
-Verificações executadas em 7 de novembro de 2026, Node.js 24, Linux.
+## Verificações locais
 
-- `npm run build`: passou (TypeScript, Vite e processos Electron).
-- `npm test`: 6 testes passaram, em 2 arquivos. Incluem trajetórias determinísticas, OHLCV positivo, agregação e conservação de volume, correlação entre ativos, relógio e persistência após reabertura SQLite.
-- `npm run test:browser`: passou em Chromium. Verificou canvas do gráfico, oito páginas, ativo e timeframe, pausa, 50x, salvamento e restauração; nenhum erro JavaScript de página.
-- `npm run test:desktop`: passou no Electron 45.2.3 em Xorg virtual. Verificou contextIsolation=true, nodeIntegration=false, sandbox=true nas preferências do renderer, ausência de require no renderer, configuração de seed, pausa/velocidade, IPC SQLite e restauração após fechar/reabrir.
+- Compilação TypeScript do renderer e de todos os pacotes/backend, build Vite e Electron.
+- 29 testes em cinco arquivos: determinismo e retomada do PRNG, regimes/eventos, OHLCV, correlação, relógio, trading, reservas, taxas/slippage, entrada média, P&L líquido, cancelamentos, limites, SL/TP, idempotência, exposição, propriedade/isolamento, migrations/persistência, restauração, falha de gravação e rollback SQLite.
+- O teste MCP usa o SDK oficial via STDIO, lista exatamente as 33 ferramentas e chama as rotas obrigatórias de mercado, conta, ordens, risco, agentes, simulação, análises e backtest. Verifica parâmetros inválidos, conta principal inacessível pelo MCP e `UNAVAILABLE` sem instância aberta.
+- Teste Electron com dados reais de um SQLite temporário: navegação das oito páginas, gráfico, compra pela interface, ordem limitada/cancelamento, criação de agente local e execução, backtest, cliente STDIO iniciado pelo executável Electron e restauração de conta/ordens/backtest após fechar e reabrir.
+- Verificação do renderer: contextIsolation=true, nodeIntegration=false, sandbox=true e ausência de `window.require`.
+- Teste de navegador conecta a interface a um serviço SQLite real por adaptadores apenas do teste; verifica gráfico, navegação, pausa e 50x. Não adiciona servidor HTTP nem simulação alternativa ao produto.
 
-Para executar o Electron dentro do executor cloud restrito, o teste utilizou `--no-sandbox --disable-gpu` e um diretório temporário de dados. Esses argumentos não são adicionados aos comandos normais de desenvolvimento/produção. Em máquinas Linux, configure o suporte de sandbox do Electron conforme o sistema.
+O executor Linux utiliza um display Xorg virtual. Para testes nesse sandbox foram necessários `--no-sandbox --disable-gpu` no launcher do Electron; esses argumentos não são adicionados à aplicação de produção. Os dados, caches e diretórios de teste são separados e não são incluídos nos releases.
 
-A versão inicial do binário Electron falhou ao criar uma janela, inclusive em um exemplo mínimo. A atualização para a versão 45.2.3 resolveu a falha. Um erro de fechamento antecipado do banco também foi corrigido, movendo o encerramento para `will-quit`.
+## Windows
 
-A validação inicial não incluía instaladores. A distribuição Windows foi adicionada posteriormente, conforme a seção abaixo. Não há certificados de assinatura, conexão MCP, agentes nem execução de ordens. Consulte README.md para arquitetura, execução e limites do modelo sintético.
+O workflow `.github/workflows/windows-release.yml` usa Windows, instala dependências, compila, executa os testes unitários/integração e o teste desktop, gera NSIS/portátil/ZIP e repete o teste com `release/win-unpacked/Market Lab.exe`, incluindo MCP via executável. Só depois publica o Release e os checksums SHA-256. A execução correspondente fica disponível na aba Actions do repositório.
 
-## Distribuição Windows
+A compatibilidade MCP foi exercitada por cliente do SDK oficial. A instalação/configuração do Claude no computador do usuário exige copiar o JSON gerado na página Conexões MCP; não foi realizada remotamente neste ambiente.
 
-Configuração portátil x64 adicionada com electron-builder. `npm run dist:win` gera `release/Market-Lab-0.1.0-Windows-x64.exe`, com Electron incluído, sem exigir instalação ou Node.js no destino. O executável ainda não tem assinatura digital. A execução nativa no Windows ainda não foi verificada neste executor Linux.
+## Observações
 
-O arquivo ASAR destinado ao Windows foi inspecionado: frontend, processo principal, preload e SQLite WASM estão presentes. O mesmo ASAR passou no teste de integração usando Electron Linux: isolamento, controles, IPC, persistência e reinício. Isso não substitui a verificação nativa no Windows.
+O teste visual encontrou campos select sem nome acessível exato; eles foram corrigidos com labels explícitos. O início do MCP por Electron no Linux exige modo headless sem janela; a configuração gerada inclui esse argumento quando necessário. A transferência de estado para o renderer foi reduzida: somente o ativo selecionado recebe histórico longo de candles; os outros recebem candles recentes para minigráficos, enquanto o histórico completo permanece no backend/SQLite.
+
+A distribuição 0.1.0 era somente uma fundação. Consulte README.md e docs/MCP.md para escopo funcional atual e limites de execução spot, liquidez indicativa, amostragem e sessões muito extensas.

@@ -1,6 +1,6 @@
 {
   "name": "market-lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -13,20 +13,25 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "build": "tsc --noEmit && vite build && npm run build:electron",
     "start": "electron .",
-    "test": "vitest run",
+    "test": "npm run build:electron && vitest run",
     "test:browser": "node scripts/check-browser.mjs",
     "format": "prettier --write src packages electron scripts",
     "test:desktop": "node scripts/check-desktop.mjs",
-    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never",
-    "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never"
+    "dist:win": "npm run build && electron-builder --win nsis portable zip --x64 --publish never",
+    "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never",
+    "mcp": "node dist-electron/packages/mcp-server/src/cli.js",
+    "dist:portable": "npm run build && electron-builder --win portable --x64 --publish never",
+    "mcp:config": "node scripts/mcp-config.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "drizzle-orm": "^0.44.0",
     "lightweight-charts": "^5.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sql.js": "^1.13.0",
+    "zod": "^4.6.7",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -66,7 +71,19 @@
     "win": {
       "target": [
         {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
           "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "x64"
           ]
@@ -74,6 +91,19 @@
       ],
       "signAndEditExecutable": false,
       "artifactName": "Market-Lab-${version}-Windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "Market-Lab-${version}-Setup-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Market Lab",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Market-Lab-${version}-Portable-${arch}.${ext}"
     }
   },
   "repository": {

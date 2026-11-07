@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("marketLab", {
-  load: () => ipcRenderer.invoke("session:load"),
-  save: (session: unknown) => ipcRenderer.invoke("session:save", session),
+  invoke: (name: string, args: unknown = {}) =>
+    ipcRenderer.invoke("lab:invoke", name, args),
+  view: (symbol?: string) => ipcRenderer.invoke("lab:view", symbol),
 });

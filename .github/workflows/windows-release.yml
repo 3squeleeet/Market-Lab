@@ -2,37 +2,66 @@ name: Windows release
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/windows-release.yml'
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: market-lab-windows-release
+  cancel-in-progress: false
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: npm test
-      - run: npm run dist:win
+      - name: Test desktop and MCP STDIO
+        run: npm run test:desktop
+      - name: Build Windows distributions
+        run: npx electron-builder --win nsis portable zip --x64 --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Verify executable and calculate checksum
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Test packaged application and MCP
+        run: npm run test:desktop
+        env:
+          MARKET_LAB_EXECUTABLE: ${{ github.workspace }}\release\win-unpacked\Market Lab.exe
+      - name: Checksums
         shell: pwsh
         run: |
-          $file = Get-Item release/Market-Lab-0.1.0-Windows-x64.exe
-          if ($file.Length -lt 1000000) { throw 'Executable is incomplete' }
-          $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($file.Name)" | Set-Content release/SHA256SUMS.txt -Encoding ascii
-      - name: Upload executable to release
+          $files = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe','.zip' }
+          if ($files.Count -lt 3) { throw 'Missing Windows distributions' }
+          $lines = foreach ($file in $files) {
+            if ($file.Length -lt 1000000) { throw 'Incomplete executable' }
+            "$((Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower())  $($file.Name)"
+          }
+          $lines | Set-Content release/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-screenshots
+          path: output/*.png
+      - name: Publish release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v0.1.0 release/Market-Lab-0.1.0-Windows-x64.exe release/SHA256SUMS.txt --clobber
-          gh release edit v0.1.0 --draft=false --latest
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --title "Market Lab $version — Windows + MCP STDIO" --notes-file RELEASE_NOTES.md --draft
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create release' }
+          }
+          $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe','.zip' -or $_.Name -eq 'SHA256SUMS.txt' }
+          foreach ($asset in $assets) {
+            gh release upload $tag $asset.FullName --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
+          }
+          gh release edit $tag --notes-file RELEASE_NOTES.md --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

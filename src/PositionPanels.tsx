@@ -1,67 +1,165 @@
-import { ArrowLeftRight } from "lucide-react";
-import { engine, useLab } from "./store";
-import { positions, money } from "./demo";
-export function PositionPanels() {
-  const s = useLab();
-  const prices = Object.fromEntries(
-    engine.quotes.map((q) => [q.symbol, q.price]),
-  );
+import { useState } from "react";
+import { useLab, run } from "./store";
+import { money, date } from "./demo";
+import { DataTable } from "./components/DataTable";
+export function PositionPanels({ accountId = "main" }: { accountId?: string }) {
+  const d = useLab((s) => s.data!),
+    portfolio =
+      accountId === "main"
+        ? d.portfolio
+        : d.agents.find((a) => a.accountId === accountId)?.portfolio;
+  const [risk, setRisk] = useState<{ symbol: string; kind: string } | null>(
+      null,
+    ),
+    [level, setLevel] = useState(""),
+    [mode, setMode] = useState("price");
+  const executions = d.executions
+    .filter((e) => e.accountId === accountId)
+    .slice(-10)
+    .reverse();
   return (
-    <div className="lower-grid">
-      <section className="panel positions">
+    <>
+      <section className="panel">
         <div className="panel-heading">
+          <h2>Posições abertas · {portfolio?.positions.length ?? 0}</h2>
+          <span className="tag">SALDO VIRTUAL</span>
+        </div>
+        <DataTable
+          headers={[
+            "Ativo",
+            "Quantidade",
+            "Entrada média",
+            "Preço atual",
+            "Valor / exposição",
+            "P&L não realizado",
+            "Proteções",
+            "Ações",
+          ]}
+          rows={(portfolio?.positions ?? []).map((p) => [
+            p.symbol,
+            p.quantity.toPrecision(8),
+            money(p.averagePrice),
+            money(p.currentPrice),
+            `${money(p.value)} / ${p.exposurePercent.toFixed(1)}%`,
+            <span className={p.unrealized >= 0 ? "positive" : "negative"}>
+              {money(p.unrealized)}
+            </span>,
+            `SL ${p.stopLoss === null ? "—" : money(p.stopLoss)} · TP ${p.takeProfit === null ? "—" : money(p.takeProfit)}`,
+            <div className="inline-actions">
+              <button
+                onClick={() => {
+                  setRisk({ symbol: p.symbol, kind: "set_stop_loss" });
+                  setLevel("");
+                }}
+              >
+                Stop
+              </button>
+              <button
+                onClick={() => {
+                  setRisk({ symbol: p.symbol, kind: "set_take_profit" });
+                  setLevel("");
+                }}
+              >
+                Alvo
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Encerrar ${p.symbol} a mercado?`))
+                    void run("close_position", { accountId, symbol: p.symbol });
+                }}
+              >
+                Fechar
+              </button>
+            </div>,
+          ])}
+        />
+      </section>
+      {risk && (
+        <form
+          className="panel form-grid"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const result = await run(risk.kind, {
+              accountId,
+              symbol: risk.symbol,
+              ...(mode === "percent"
+                ? { percent: Number(level) }
+                : { price: Number(level) }),
+            });
+            if (result) setRisk(null);
+          }}
+        >
           <h2>
-            Posições ativas <span className="count">3</span>
+            {risk.kind === "set_stop_loss" ? "Stop-loss" : "Take-profit"} ·{" "}
+            {risk.symbol}
           </h2>
-          <span className="tag">DEMONSTRAÇÃO</span>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Ativo</th>
-              <th>Quantidade</th>
-              <th>Entrada</th>
-              <th>Preço atual</th>
-              <th>P&L não realizado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map((p) => {
-              const pl = p.quantity * (prices[p.symbol] - p.entry);
-              return (
-                <tr key={p.symbol}>
-                  <td>
-                    <strong>{p.symbol}</strong>
-                    <span className="long">LONG</span>
-                  </td>
-                  <td>{p.quantity}</td>
-                  <td>{money(p.entry)}</td>
-                  <td>{money(prices[p.symbol])}</td>
-                  <td className={pl >= 0 ? "positive" : "negative"}>
-                    {pl >= 0 ? "+" : ""}
-                    {money(pl)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
-      <section className="panel trades">
+          <label>
+            Modo
+            <select
+              aria-label="Modo"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            >
+              <option value="price">Preço absoluto</option>
+              <option value="percent">Percentual da entrada</option>
+            </select>
+          </label>
+          <label>
+            Nível
+            <input
+              required
+              type="number"
+              step="any"
+              min="0.00000001"
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+            />
+          </label>
+          <button className="primary">Salvar proteção</button>
+          <button
+            type="button"
+            onClick={async () => {
+              await run(risk.kind, {
+                accountId,
+                symbol: risk.symbol,
+                price: null,
+              });
+              setRisk(null);
+            }}
+          >
+            Remover proteção
+          </button>
+          <button type="button" onClick={() => setRisk(null)}>
+            Voltar
+          </button>
+        </form>
+      )}
+      <section className="panel">
         <div className="panel-heading">
-          <h2>Operações recentes</h2>
-          <ArrowLeftRight size={15} />
+          <h2>Execuções recentes</h2>
+          <span>{executions.length} últimas</span>
         </div>
-        <div className="empty">
-          <ArrowLeftRight size={23} />
-          <strong>Pronto para o primeiro experimento</strong>
-          <p>
-            Nenhuma operação executada nesta sessão.
-            <br />
-            Execução de ordens prevista para a versão 0.2.
-          </p>
-        </div>
+        <DataTable
+          headers={[
+            "Horário simulado",
+            "Ativo",
+            "Lado",
+            "Quantidade",
+            "Preço",
+            "Taxa",
+            "Slippage",
+          ]}
+          rows={executions.map((e) => [
+            date(e.time),
+            e.symbol,
+            e.side === "buy" ? "Compra" : "Venda",
+            e.quantity.toPrecision(8),
+            money(e.price),
+            money(e.fee),
+            money(e.slippage),
+          ])}
+        />
       </section>
-    </div>
+    </>
   );
 }

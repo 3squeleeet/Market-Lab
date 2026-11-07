@@ -1,50 +1,23 @@
-import { useEffect, useState } from "react";
-import { ArrowUpRight, FlaskConical, Bot, ExternalLink } from "lucide-react";
+import { useEffect } from "react";
+import { FlaskConical } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { MarketTerminal } from "./MarketTerminal";
 import { TimeControls } from "./TimeControls";
 import { PositionPanels } from "./PositionPanels";
-import { engine, clock, useLab, initialize, persist } from "./store";
-import { unrealized } from "../packages/trading-engine/src/index";
-import { positions, money } from "./demo";
+import { AccountSummary } from "./components/AccountSummary";
+import { DataTable } from "./components/DataTable";
+import { Trading } from "./pages/Trading";
+import { Agents } from "./pages/Agents";
+import { Analytics } from "./pages/Analytics";
+import { Settings } from "./pages/Settings";
+import { MCP } from "./pages/MCP";
+import { useLab, initialize } from "./store";
+import { money, date } from "./demo";
 export function App() {
-  const s = useLab();
-  const [seed, setSeed] = useState(42);
-  const [vol, setVol] = useState(1);
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setInterval>;
-    let saver: ReturnType<typeof setInterval>;
-    initialize().then(() => {
-      if (stopped) return;
-      setSeed(engine.seed);
-      setVol(engine.volatility);
-      let last = performance.now();
-      timer = setInterval(() => {
-        const now = performance.now();
-        const before = engine.ticks;
-        clock.advance(now - last, () => engine.step());
-        last = now;
-        if (engine.ticks !== before) useLab.getState().refresh();
-      }, 100);
-      saver = setInterval(() => void persist(), 5000);
-    });
-    const save = () => void persist();
-    window.addEventListener("beforeunload", save);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      clearInterval(saver);
-      window.removeEventListener("beforeunload", save);
-    };
-  }, []);
-  const prices = Object.fromEntries(
-    engine.quotes.map((q) => [q.symbol, q.price]),
-  );
-  const pnl = unrealized(positions, prices);
-  const cost = positions.reduce((a, p) => a + p.entry * p.quantity, 0);
-  const cash = 100000 - cost;
-  const main = ["Visão geral", "Mercados", "Trading"].includes(s.page);
+  const s = useLab(),
+    d = s.data;
+  useEffect(() => initialize(), []);
+  const chart = ["Visão geral", "Mercados", "Trading"].includes(s.page);
   return (
     <div className="app">
       <Sidebar />
@@ -57,171 +30,164 @@ export function App() {
             <span className="sim-badge">
               <i /> AMBIENTE SIMULADO
             </span>
-            <span className="version">v0.1.0</span>
+            <span className="version">v{d?.version ?? "0.2.0"}</span>
           </div>
         </header>
         <div className="content">
           <div className="title-row">
             <div>
-              <div className="eyebrow">MARKET LAB / TERMINAL</div>
+              <div className="eyebrow">MARKET LAB / TERMINAL LOCAL</div>
               <h1>{s.page}</h1>
-              <p>Explore o mercado. Teste ideias. Entenda os movimentos.</p>
+              <p>
+                Explore o mercado. Teste estratégias. Negocie exclusivamente com
+                capital virtual.
+              </p>
             </div>
-            <div className="session">
-              <i /> Sessão #{String(s.seed).padStart(4, "0")} <span>•</span>{" "}
-              <span>{s.running ? "Em execução" : "Pausada"}</span>
-            </div>
+            {d && (
+              <div className="session">
+                <i /> Seed {d.market.seed} ·{" "}
+                {d.simulation.running ? "Em execução" : "Pausada"}
+              </div>
+            )}
           </div>
-          {s.error && (
-            <div role="alert" className="notice">
-              {s.error}
-            </div>
-          )}
           <div className="notice">
             <FlaskConical size={14} />
             <span>
-              Todos os preços, saldos e resultados são sintéticos. Nenhuma
+              Preços, saldos, ordens e resultados são sintéticos. Nenhuma
               transação financeira real.
             </span>
-            <span className="notice-label">SIMULAÇÃO</span>
           </div>
-          {(main || s.page === "Portfólio") && (
-            <div className="stats">
-              {[
-                [
-                  "Saldo disponível",
-                  money(cash),
-                  "Capital virtual disponível",
-                  "",
-                ],
-                [
-                  "Patrimônio total",
-                  money(100000 + pnl),
-                  `${pnl >= 0 ? "+" : ""}${money(pnl)} desde o início`,
-                  pnl >= 0 ? "positive" : "negative",
-                ],
-                [
-                  "P&L não realizado",
-                  money(pnl),
-                  "3 posições de demonstração",
-                  pnl >= 0 ? "positive" : "negative",
-                ],
-                ["P&L realizado", money(0), "Nenhuma operação executada", ""],
-              ].map(([label, value, detail, color]) => (
-                <div className="stat" key={label}>
-                  <div>
-                    {label}
-                    <ArrowUpRight size={14} />
-                  </div>
-                  <strong className={color}>{value}</strong>
-                  <small className={color}>{detail}</small>
-                </div>
-              ))}
-            </div>
-          )}
-          {main ? (
-            <>
-              <MarketTerminal />
-              <TimeControls />
-            </>
-          ) : null}
-          {(main || s.page === "Portfólio") && <PositionPanels />}
-          {s.page === "Trading" && (
-            <div className="notice">
-              O gráfico e as cotações estão ativos. Envio e execução de ordens
-              ainda não estão disponíveis.
-            </div>
-          )}
-          {s.page === "Configurações" && (
-            <section className="panel settings">
-              <h2>Configuração do experimento</h2>
-              <p>
-                Aplicar inicia uma nova trajetória determinística. As posições
-                são dados de demonstração.
-              </p>
-              <label>
-                Seed
-                <input
-                  type="number"
-                  value={seed}
-                  onChange={(e) => setSeed(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Volatilidade (0,1–5)
-                <input
-                  type="number"
-                  min="0.1"
-                  max="5"
-                  step="0.1"
-                  value={vol}
-                  onChange={(e) => setVol(Number(e.target.value))}
-                />
-              </label>
-              <button
-                className="primary"
-                disabled={
-                  !Number.isSafeInteger(seed) ||
-                  vol < 0.1 ||
-                  vol > 5 ||
-                  !Number.isFinite(vol)
-                }
-                onClick={() => {
-                  s.reset(seed, vol);
-                  void persist();
-                }}
-              >
-                Aplicar e reiniciar
+          {s.error && (
+            <div role="alert" className="notice error">
+              {s.error}
+              <button onClick={() => useLab.setState({ error: "" })}>
+                Fechar aviso
               </button>
-              <p>
-                Persistência:{" "}
-                {window.marketLab
-                  ? "SQLite local via Electron"
-                  : "localStorage — prévia no navegador"}
-                . Salvamento automático a cada 5 segundos.
-              </p>
-            </section>
+            </div>
           )}
-          {s.page === "Análises" && (
+          {!d ? (
             <section className="panel settings">
-              <h2>Diagnóstico do mercado sintético</h2>
+              <h2>
+                {s.ready
+                  ? "Backend local indisponível"
+                  : "Carregando sessão persistida…"}
+              </h2>
               <p>
-                Regime atual: {["Lateral", "Alta", "Estresse"][engine.regime]}
-              </p>
-              <p>
-                {engine.ticks.toLocaleString()} ticks gerados · fator comum{" "}
-                {engine.factor.toFixed(4)} · volatilidade {s.volatility}x
-              </p>
-              <p>
-                Retornos correlacionados, distribuição lognormal e OHLCV
-                agregados pelo relógio da simulação.
+                Abra o aplicativo Electron. O navegador isolado não executa uma
+                segunda simulação.
               </p>
             </section>
-          )}
-          {["Agentes de IA", "Conexões MCP"].includes(s.page) && (
-            <section className="panel placeholder">
-              <Bot size={40} />
-              <h2>{s.page}</h2>
-              <p>
-                Interfaces do módulo preparadas. Integração e execução ainda não
-                implementadas nesta versão.
-              </p>
-              <span className="tag">PRÓXIMO MARCO</span>
-            </section>
+          ) : (
+            <>
+              {["Visão geral", "Trading", "Portfólio"].includes(s.page) && (
+                <AccountSummary />
+              )}
+              {chart && <MarketTerminal />}
+              <TimeControls />
+              {s.page === "Trading" && <Trading />}
+              {["Visão geral", "Portfólio"].includes(s.page) && (
+                <PositionPanels />
+              )}
+              {s.page === "Visão geral" && (
+                <section className="panel">
+                  <div className="panel-heading">
+                    <h2>Eventos do mercado</h2>
+                    <span>
+                      Regime: {["lateral", "alta", "estresse"][d.market.regime]}
+                    </span>
+                  </div>
+                  <DataTable
+                    headers={["Horário simulado", "Tipo", "Descrição"]}
+                    rows={[...d.market.events]
+                      .reverse()
+                      .slice(0, 20)
+                      .map((e) => [date(e.time), e.kind, e.description])}
+                  />
+                </section>
+              )}
+              {s.page === "Mercados" && <MarketDetails />}
+              {s.page === "Portfólio" && (
+                <section className="panel">
+                  <div className="panel-heading">
+                    <h2>Histórico de fechamentos</h2>
+                    <span>Valor investido: {money(d.portfolio.invested)}</span>
+                  </div>
+                  <DataTable
+                    headers={[
+                      "Ativo",
+                      "Quantidade",
+                      "Entrada",
+                      "Saída",
+                      "P&L líquido",
+                      "Motivo",
+                      "Fechamento",
+                    ]}
+                    rows={[...d.closed]
+                      .filter((p) => p.accountId === "main")
+                      .reverse()
+                      .map((p) => [
+                        p.symbol,
+                        p.quantity,
+                        money(p.entryPrice),
+                        money(p.exitPrice),
+                        money(p.pnl),
+                        p.reason,
+                        date(p.closedAt),
+                      ])}
+                  />
+                </section>
+              )}
+              {s.page === "Agentes de IA" && <Agents />}
+              {s.page === "Análises" && <Analytics />}
+              {s.page === "Conexões MCP" && <MCP />}
+              {s.page === "Configurações" && <Settings />}
+            </>
           )}
           <footer>
             <span>
-              <i /> Motor operacional <span className="divider">|</span>{" "}
-              Execução local <span className="divider">|</span>{" "}
-              {s.ready ? "Sessão carregada" : "Carregando sessão…"}
+              <i /> {d ? "Backend local operacional" : "Aguardando backend"}{" "}
+              <span className="divider">|</span> SQLite transacional{" "}
+              <span className="divider">|</span>{" "}
+              {d ? "Sessão carregada" : "Inicializando"}
             </span>
-            <span>
-              Feito para experimentar. Projetado para aprender.{" "}
-              <ExternalLink size={12} />
-            </span>
+            <span>100% sintético · Sem serviços financeiros externos</span>
           </footer>
         </div>
       </main>
     </div>
+  );
+}
+function MarketDetails() {
+  const s = useLab(),
+    q = s.data!.market.quotes.find((q) => q.symbol === s.symbol)!,
+    closes = q.candles.map((c) => c.close);
+  const mean = (v: number[]) =>
+    v.length ? v.reduce((s, n) => s + n, 0) / v.length : 0;
+  let gain = 0,
+    loss = 0;
+  for (let i = Math.max(1, closes.length - 14); i < closes.length; i++) {
+    const x = closes[i] - closes[i - 1];
+    gain += Math.max(0, x);
+    loss += Math.max(0, -x);
+  }
+  return (
+    <section className="panel settings">
+      <h2>Indicadores sintéticos · {q.symbol}</h2>
+      <p>
+        SMA 10: {money(mean(closes.slice(-10)))} · SMA 30:{" "}
+        {money(mean(closes.slice(-30)))} · RSI 14:{" "}
+        {(gain + loss === 0
+          ? 50
+          : loss === 0
+            ? 100
+            : 100 - 100 / (1 + gain / loss)
+        ).toFixed(2)}
+      </p>
+      <p>
+        Spread atual: {money(q.ask - q.bid)} · Volume acumulado:{" "}
+        {q.volume.toFixed(4)} · {q.candles.length} candles em memória, histórico
+        completo no SQLite.
+      </p>
+    </section>
   );
 }
