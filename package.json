@@ -1,0 +1,47 @@
+{
+  "name": "market-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:desktop": "npm run build:electron && concurrently -k \"vite --host 0.0.0.0\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "tsc --noEmit && vite build && npm run build:electron",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:browser": "node scripts/check-browser.mjs",
+    "format": "prettier --write src packages electron scripts",
+    "test:desktop": "node scripts/check-desktop.mjs"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "lightweight-charts": "^5.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sql.js": "^1.13.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/sql.js": "^1.4.9",
+    "@vitejs/plugin-react": "^4.4.0",
+    "concurrently": "^9.1.0",
+    "electron": "^45.2.3",
+    "prettier": "^3.9.10",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.0",
+    "wait-on": "^8.0.0"
+  }
+}
