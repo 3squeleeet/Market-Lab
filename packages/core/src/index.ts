@@ -30,10 +30,13 @@ import { performance } from "./analytics.js";
 import { runBacktest } from "./backtest.js";
 import type { Repository } from "../../database/src/index.js";
 import { assertJSON } from "../../shared/src/validation.js";
-export const VERSION = "0.2.0";
+export const VERSION = "0.2.1";
 export const SIMULATION_ONLY = true;
 type Actor = "ui" | "mcp";
 type Params = {
+  delaySeconds?: number;
+  durationSeconds?: number;
+  text?: string;
   accountId?: string;
   symbol?: Symbol;
   limit?: number;
@@ -42,6 +45,7 @@ type Params = {
   depth?: number;
   requestId?: string;
   side?: "buy" | "sell";
+  positionSide?: "long" | "short";
   quantity?: number;
   price?: number | null;
   stopLoss?: number;
@@ -97,6 +101,7 @@ export class LabService {
         market: this.market.snapshot(),
         trading: this.trading.state,
         agents: [],
+        news: [],
         equity: [],
         backtests: [],
         audit: [],
@@ -191,49 +196,19 @@ export class LabService {
       this.state.agents.find((a) => a.accountId === accountId)?.maxExposure ?? 1
     );
   }
-  private external() {
-    let a = this.state.agents.find((a) => a.id === "external");
-    if (!a) {
-      const before = this.snapshot();
-      try {
-        this.trading.addAccount("external", "Claude / MCP", 100000);
-        a = {
-          id: "external",
-          accountId: "external",
-          owner: "mcp",
-          name: "Claude / MCP",
-          description:
-            "Conta isolada para comandos externos; conexão exibida no painel MCP.",
-          assets: [...SYMBOLS],
-          capital: 100000,
-          maxExposure: 1,
-          strategy: "external",
-          status: "running",
-          lastDecision: 0,
-          history: [],
-        };
-        this.state.agents.push(a);
-        this.sample();
-        this.commit();
-      } catch (e) {
-        this.restore(before);
-        throw e;
-      }
-    }
-    return a;
-  }
   private account(actor: Actor, id?: string) {
-    const account = id ?? (actor === "ui" ? "main" : this.external().accountId);
+    const account = id ?? "main";
     this.trading.account(account);
     if (
       actor === "mcp" &&
+      account !== "main" &&
       !this.state.agents.some(
         (a) => a.accountId === account && a.owner === "mcp",
       )
     )
       throw new TradingError(
         "FORBIDDEN",
-        "MCP não pode acessar a conta principal nem agentes locais",
+        "MCP não pode acessar contas de agentes locais",
       );
     return account;
   }
@@ -342,6 +317,29 @@ export class LabService {
       }
     }
   }
+  private applyNewsImpacts() {
+    for (const plan of this.state.newsImpacts ?? []) {
+      if (
+        plan.status === "completed" ||
+        (plan.durationSeconds > 0
+          ? this.market.time <= plan.startTime
+          : this.market.time < plan.startTime)
+      )
+        continue;
+      const quote = this.market.quotes.find((q) => q.symbol === plan.symbol)!;
+      this.market.setPrice(
+        plan.symbol,
+        Math.max(1e-8, Math.min(1e12, quote.price * Math.exp(plan.logStep))),
+      );
+      const candle = quote.candles.at(-1)!;
+      candle.close = quote.price;
+      candle.high = Math.max(candle.high, quote.price);
+      candle.low = Math.min(candle.low, quote.price);
+      plan.appliedSteps++;
+      plan.status =
+        plan.appliedSteps >= plan.totalSteps ? "completed" : "active";
+    }
+  }
   advance(ticks: number, persist = true) {
     const before = persist ? this.snapshot() : null;
     try {
@@ -361,6 +359,7 @@ export class LabService {
             if (q.candles.length > 7200) q.candles.shift();
           }
         } else this.market.step();
+        this.applyNewsImpacts();
         for (const q of this.market.quotes) {
           const candle = q.candles.at(-1);
           if (candle) this.pendingCandles.push({ symbol: q.symbol, candle });
@@ -381,10 +380,32 @@ export class LabService {
       throw e;
     }
   }
-  view(symbol: Symbol = "BTC/USD"): LabView {
+  advanceRealtime(ticks: number) {
+    const sequence = this.trading.state.sequence;
+    try {
+      this.advance(ticks, false);
+      if (
+        this.trading.state.sequence !== sequence ||
+        Date.now() - this.repository.lastSaved >= 2000
+      ) {
+        this.sample();
+        this.commit();
+      }
+    } catch (error) {
+      const saved = this.repository.loadState();
+      if (saved) this.restore(saved);
+      throw error;
+    }
+  }
+  view(
+    symbol: Symbol = "BTC/USD",
+    options?: { sessionId?: string; since?: number; page?: string },
+  ): LabView {
     const t = this.trading.state,
       portfolio = this.trading.portfolio("main", this.market.quotes);
     return structuredClone({
+      news: (this.state.news ?? []).slice(-50),
+      newsSchedule: (this.state.newsImpacts ?? []).slice(-50),
       version: VERSION,
       sessionId: this.state.sessionId,
       market: {
@@ -396,16 +417,22 @@ export class LabService {
         factor: this.market.factor,
         quotes: this.market.quotes.map((q) => ({
           ...q,
-          candles: q.candles.slice(q.symbol === symbol ? -7200 : -120),
+          candles:
+            q.symbol === symbol
+              ? options?.sessionId === this.state.sessionId &&
+                options.since !== undefined
+                ? q.candles.filter((c) => c.time >= options.since!)
+                : q.candles
+              : q.candles.slice(-30),
         })),
         events: this.market.events.slice(-200),
       },
       simulation: this.state.simulation,
       config: t.config,
       portfolio,
-      orders: t.orders.slice(-1000),
-      executions: t.executions.slice(-1000),
-      closed: t.closed.slice(-1000),
+      orders: t.orders.slice(options ? -100 : -1000),
+      executions: t.executions.slice(options ? -100 : -1000),
+      closed: t.closed.slice(options ? -100 : -1000),
       agents: this.state.agents.map((a) => ({
         ...a,
         history: a.history.slice(-100),
@@ -421,8 +448,12 @@ export class LabService {
       equity: this.state.equity
         .filter((x) => x.accountId === "main")
         .slice(-2000),
-      backtests: this.state.backtests,
-      audit: this.state.audit.slice(-250),
+      backtests:
+        options && options.page !== "Análises" ? [] : this.state.backtests,
+      audit:
+        options && options.page !== "Configurações"
+          ? []
+          : this.state.audit.slice(-100),
       mcp: this.mcpStatus,
       database: {
         path: this.repository.path,
@@ -441,7 +472,7 @@ export class LabService {
         "Ferramenta administrativa não disponível por MCP",
       );
     const p = schemas[tool].parse(args) as Params;
-    if (actor === "mcp") this.external();
+
     const before = READ_ONLY.has(tool) ? null : this.snapshot();
     try {
       const result = this.dispatch(tool, p, actor);
@@ -489,6 +520,61 @@ export class LabService {
     const pf = () => this.trading.portfolio(account(), quotes);
     const historyLimit = p.limit ?? 250;
     switch (name) {
+      case "get_market_news":
+        return (this.state.news ?? [])
+          .slice(-(p.limit ?? 20))
+          .map((n) => ({ text: n.text }));
+      case "publish_news": {
+        const target = quotes.find((q) => q.symbol === p.symbol)!;
+        const next = target.price * (1 + p.percent! / 100);
+        if (!Number.isFinite(next) || next < 1e-8 || next > 1e12)
+          throw Error("Impacto resulta em preço fora dos limites da simulação");
+        const news = {
+          id: randomUUID(),
+          time: this.market.time,
+          text: p.text!,
+        };
+        (this.state.news ??= []).push(news);
+        const totalSteps = Math.max(1, p.durationSeconds ?? 0);
+        const plan = {
+          newsId: news.id,
+          symbol: p.symbol!,
+          percent: p.percent!,
+          startTime: this.market.time + (p.delaySeconds ?? 0),
+          durationSeconds: p.durationSeconds ?? 0,
+          totalSteps,
+          appliedSteps: 0,
+          logStep: Math.log(1 + p.percent! / 100) / totalSteps,
+          status: "pending" as "pending" | "active" | "completed",
+        };
+        (this.state.newsImpacts ??= []).push(plan);
+        if (p.delaySeconds || p.durationSeconds) return news;
+        const opens = new Map(quotes.map((q) => [q.symbol, q.price]));
+        this.market.time++;
+        this.market.ticks++;
+        this.market.setPrice(p.symbol!, next);
+        for (const q of quotes) {
+          const open = opens.get(q.symbol)!;
+          const candle = {
+            time: this.market.time,
+            open,
+            high: Math.max(open, q.price),
+            low: Math.min(open, q.price),
+            close: q.price,
+            volume: 0,
+          };
+          q.candles.push(candle);
+          if (q.candles.length > 7200) q.candles.shift();
+          this.pendingCandles.push({ symbol: q.symbol, candle });
+        }
+        news.time = this.market.time;
+        plan.appliedSteps = 1;
+        plan.status = "completed";
+        this.trading.onTick(quotes, this.market.time, (id) =>
+          this.exposure(id),
+        );
+        return news;
+      }
       case "get_market_overview":
         return quotes.map(({ candles, ...q }) => q);
       case "get_asset_price":
@@ -564,15 +650,17 @@ export class LabService {
         const id = account();
         return t.orders.filter((x) => x.accountId === id).slice(-historyLimit);
       }
+      case "open_short":
       case "place_market_order":
       case "place_limit_order": {
         const id = account();
         this.assertAgentOrder(id, p.symbol!);
         const input: OrderInput = {
+          positionSide: p.positionSide ?? "long",
           requestId: p.requestId!,
           symbol: p.symbol!,
           side: p.side!,
-          type: name === "place_market_order" ? "market" : "limit",
+          type: name === "place_limit_order" ? "limit" : "market",
           quantity: p.quantity!,
           ...(p.price != null ? { price: p.price } : {}),
           ...(p.stopLoss ? { stopLoss: p.stopLoss } : {}),
@@ -585,6 +673,7 @@ export class LabService {
           time,
           this.exposure(id),
         );
+        if (!o.source) o.source = actor;
         const a = this.state.agents.find((a) => a.accountId === id);
         if (a)
           recordDecision(
@@ -598,8 +687,11 @@ export class LabService {
       }
       case "cancel_order":
         return this.trading.cancel(account(), p.orderId!, time);
-      case "close_position":
-        return this.trading.close(account(), p.symbol!, quotes, time);
+      case "close_position": {
+        const o = this.trading.close(account(), p.symbol!, quotes, time);
+        o.source = actor;
+        return o;
+      }
       case "set_stop_loss":
         return this.trading.setRisk(
           account(),
@@ -619,7 +711,6 @@ export class LabService {
           quotes,
         );
       case "list_agents":
-        if (actor === "mcp") this.external();
         return this.state.agents
           .filter((a) => actor === "ui" || a.owner === "mcp")
           .map((a) => ({
@@ -864,6 +955,7 @@ export class LabService {
         if (!p.symbol || value! <= 0 || value! > 1e12)
           throw Error("Ativo e preço positivo obrigatórios");
         this.market.setPrice(p.symbol, value!);
+        this.applyNewsImpacts();
         for (const q of this.market.quotes) {
           const candle = q.candles.at(-1);
           if (candle) this.pendingCandles.push({ symbol: q.symbol, candle });
@@ -916,6 +1008,8 @@ export class LabService {
           ...this.state,
           sessionId: randomUUID(),
           agents: [],
+          news: [],
+          newsImpacts: [],
           equity: [],
           backtests: [],
           audit,

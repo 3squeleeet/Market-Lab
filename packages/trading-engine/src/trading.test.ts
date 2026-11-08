@@ -193,3 +193,92 @@ describe("contabilidade e execução spot", () => {
     expect(() => t.submit("b", order("sell", "sell"), [quote()], 2)).toThrow();
   });
 });
+
+it("SHORT reserva margem 1x, lucra na queda e cobre com taxas sem alterar a identidade contábil", () => {
+  const t = new TradingEngine();
+  const entry = t.submit(
+    "main",
+    { ...order("short", "sell", 2), positionSide: "short" },
+    [quote(100)],
+    1,
+  );
+  const p = t.position("main", "BTC/USD")!;
+  expect(p.direction).toBe("short");
+  expect(t.account("main").cash).toBeCloseTo(
+    100000 - entry.executedPrice! * 2 - entry.fees,
+  );
+  const pf = t.portfolio("main", [quote(80)]);
+  expect(pf.unrealized).toBeGreaterThan(0);
+  expect(pf.equity - 100000).toBeCloseTo(pf.realized + pf.unrealized, 8);
+  t.close("main", "BTC/USD", [quote(80)], 2);
+  expect(t.state.positions).toHaveLength(0);
+  expect(t.account("main").realized).toBeGreaterThan(0);
+  expect(t.account("main").cash - 100000).toBeCloseTo(
+    t.account("main").realized,
+    8,
+  );
+});
+it("SHORT suporta limite, reserva e stop acima da entrada", () => {
+  const t = new TradingEngine();
+  const o = t.submit(
+    "main",
+    {
+      ...order("short-limit", "sell", 2),
+      positionSide: "short",
+      type: "limit",
+      price: 110,
+    },
+    [quote(100)],
+    1,
+  );
+  expect(o.status).toBe("pending");
+  expect(t.reservedCash("main")).toBeCloseTo(220.22);
+  t.onTick([quote(111)], 2);
+  expect(o.status).toBe("filled");
+  const p = t.setRisk("main", "BTC/USD", "stopLoss", null, 5, [quote(111)]);
+  expect(p.stopLoss).toBeGreaterThan(p.averagePrice);
+  t.onTick([quote(120)], 3);
+  expect(t.state.positions).toHaveLength(0);
+  expect(t.state.closed[0].reason).toBe("stop_loss");
+});
+it("SHORT é liquidado na alta e gaps não geram saldo negativo", () => {
+  const t = new TradingEngine();
+  t.submit(
+    "main",
+    { ...order("short-gap", "sell", 2), positionSide: "short" },
+    [quote(100)],
+    1,
+  );
+  t.onTick([quote(1000)], 2);
+  expect(t.state.positions).toHaveLength(0);
+  expect(t.state.closed[0].reason).toBe("margin_liquidation");
+  expect(t.state.closed[0].gapProtection).toBeGreaterThan(0);
+  expect(t.account("main").cash).toBeGreaterThan(0);
+  expect(t.account("main").cash - 100000).toBeCloseTo(
+    t.account("main").realized,
+    8,
+  );
+});
+it("SHORT impede hedge oposto e permite redução parcial e take-profit", () => {
+  const t = new TradingEngine();
+  t.submit(
+    "main",
+    { ...order("short-a", "sell", 3), positionSide: "short" },
+    [quote(100)],
+    1,
+  );
+  expect(() =>
+    t.submit("main", order("opposite", "buy", 1), [quote(100)], 2),
+  ).toThrow("inverter");
+  t.submit(
+    "main",
+    { ...order("cover-one", "buy", 1), positionSide: "short" },
+    [quote(90)],
+    3,
+  );
+  expect(t.position("main", "BTC/USD")?.quantity).toBe(2);
+  t.setRisk("main", "BTC/USD", "takeProfit", 80, undefined, [quote(90)]);
+  t.onTick([quote(79)], 4);
+  expect(t.state.positions).toHaveLength(0);
+  expect(t.state.closed.at(-1)?.reason).toBe("take_profit");
+});

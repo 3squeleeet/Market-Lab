@@ -68,6 +68,13 @@ it("SDK oficial negocia STDIO, valida ferramentas e opera o estado real da instÃ
       expect(result.isError, JSON.stringify(result)).toBe(false);
       return (result.structuredContent as { data: unknown }).data;
     };
+    const owned = (await call("create_agent", {
+      name: "Owned",
+      assets: ["ETH/USD"],
+      capital: 1000,
+      maxExposure: 0.5,
+      strategy: "external",
+    })) as { id: string };
     const btc = lab.market.quotes[0];
     for (const [name, args] of [
       ["get_market_overview", {}],
@@ -81,8 +88,8 @@ it("SDK oficial negocia STDIO, valida ferramentas e opera o estado real da instÃ
       ["get_trade_history", {}],
       ["get_order_history", {}],
       ["list_agents", {}],
-      ["get_agent_performance", { agentId: "external" }],
-      ["get_agent_history", { agentId: "external" }],
+      ["get_agent_performance", { agentId: owned.id }],
+      ["get_agent_history", { agentId: owned.id }],
       ["get_simulation_status", {}],
       ["get_simulation_configuration", {}],
       ["get_performance_metrics", {}],
@@ -123,18 +130,18 @@ it("SDK oficial negocia STDIO, valida ferramentas e opera o estado real da instÃ
       strategy: "buy_hold",
     });
 
-    expect(lab.trading.position("external", "BTC/USD")?.quantity).toBe(0.01);
+    expect(lab.trading.position("main", "BTC/USD")?.quantity).toBe(0.01);
     expect(
       lab.trading.state.positions.some((p) => p.accountId === "main"),
-    ).toBe(false);
+    ).toBe(true);
     const denied = await client.callTool({
       name: "get_portfolio",
-      arguments: { accountId: "main" },
+      arguments: { accountId: "not-owned" },
     });
     expect(denied.isError).toBe(true);
     expect(lab.mcpStatus?.connections).toBeGreaterThan(0);
     await call("close_position", { symbol: "BTC/USD" });
-    expect(lab.trading.position("external", "BTC/USD")).toBeUndefined();
+    expect(lab.trading.position("main", "BTC/USD")).toBeUndefined();
     await client.close();
     bridge.close();
     const unavailable = await bridgeRequest(

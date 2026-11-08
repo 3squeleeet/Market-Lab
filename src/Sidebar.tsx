@@ -1,4 +1,5 @@
 import {
+  Newspaper,
   LayoutDashboard,
   ChartNoAxesCombined,
   ArrowLeftRight,
@@ -15,6 +16,7 @@ import { useLab } from "./store";
 const nav = [
   ["Visão geral", LayoutDashboard],
   ["Mercados", ChartNoAxesCombined],
+  ["Notícias", Newspaper],
   ["Trading", ArrowLeftRight],
   ["Agentes de IA", Bot],
   ["Portfólio", BriefcaseBusiness],
@@ -31,7 +33,7 @@ export function Sidebar() {
           <FlaskConical size={23} />
         </span>
         market<span className="brand-light">lab</span>
-        <sup>0.2</sup>
+        <sup>0.2.1</sup>
       </a>
       <div className="workspace">
         <span className="avatar">ML</span>

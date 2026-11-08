@@ -1,3 +1,4 @@
+import { News, NewsFeed } from "./pages/News";
 import { useEffect } from "react";
 import { FlaskConical } from "lucide-react";
 import { Sidebar } from "./Sidebar";
@@ -84,6 +85,8 @@ export function App() {
               )}
               {chart && <MarketTerminal />}
               <TimeControls />
+              {s.page === "Notícias" && <News />}
+              {s.page === "Visão geral" && <NewsFeed compact />}
               {s.page === "Trading" && <Trading />}
               {["Visão geral", "Portfólio"].includes(s.page) && (
                 <PositionPanels />

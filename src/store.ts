@@ -38,13 +38,22 @@ export const useLab = create<State>((set) => ({
   },
 }));
 let refreshing = false;
+let lastSession = "";
+const histories = new Map<
+  string,
+  import("../packages/shared/src/index").Candle[]
+>();
 export async function refresh() {
   if (refreshing || !window.marketLab) return;
   refreshing = true;
   try {
-    const reply = await window.marketLab.view(
-      useLab.getState().symbol as Symbol,
-    );
+    const current = useLab.getState(),
+      history = histories.get(current.symbol);
+    const reply = await window.marketLab.view(current.symbol as Symbol, {
+      sessionId: lastSession,
+      since: history?.at(-1)?.time,
+      page: current.page,
+    });
     if (!reply.ok) throw Error(reply.error.message);
     if (
       !reply.data ||
@@ -52,6 +61,23 @@ export async function refresh() {
       reply.data.portfolio?.equity === undefined
     )
       throw Error("Resposta de estado inválida");
+    if (lastSession !== reply.data.sessionId) {
+      histories.clear();
+      lastSession = reply.data.sessionId;
+    }
+    const selected = reply.data.market.quotes.find(
+      (q) => q.symbol === current.symbol,
+    )!;
+    const old = histories.get(current.symbol) ?? [];
+    const first = selected.candles[0]?.time;
+    const merged =
+      first === undefined
+        ? old
+        : [...old.filter((c) => c.time < first), ...selected.candles].slice(
+            -7200,
+          );
+    histories.set(current.symbol, merged);
+    selected.candles = merged;
     useLab.setState((s) => ({
       data: reply.data,
       interval: s.ready ? s.interval : reply.data.simulation.chartInterval,
@@ -98,6 +124,8 @@ export function initialize() {
     return () => {};
   }
   void refresh();
-  const timer = setInterval(() => void refresh(), 500);
+  const timer = setInterval(() => {
+    if (!document.hidden) void refresh();
+  }, 750);
   return () => clearInterval(timer);
 }

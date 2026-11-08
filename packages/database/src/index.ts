@@ -33,6 +33,15 @@ export async function openDatabase(path: string) {
   let db = drizzle(sqlite, { schema });
   let closed = false;
   let lastSaved = 0;
+  const rowCache = new Map<string, string>();
+  function writeRow(sql: string, values: (string | number)[], keySize = 2) {
+    const key = sql + JSON.stringify(values.slice(0, keySize)),
+      payload = String(values.at(-1));
+    if (rowCache.get(key) === payload) return;
+    sqlite.run(sql, values);
+    rowCache.set(key, payload);
+  }
+
   const flush = () => {
     mkdirSync(dirname(path), { recursive: true });
     const fd = openSync(path + ".tmp", "w", 0o600);
@@ -82,6 +91,7 @@ export async function openDatabase(path: string) {
       sqlite.run("COMMIT");
       flush();
     } catch (e) {
+      rowCache.clear();
       try {
         sqlite.run("ROLLBACK");
       } catch {}
@@ -95,12 +105,20 @@ export async function openDatabase(path: string) {
     state: LabState,
     pendingCandles: { symbol: Symbol; candle: Candle }[] = [],
   ) {
+    const compact = {
+      ...state,
+      market: {
+        ...state.market,
+        quotes: state.market.quotes.map((q) => ({ ...q, candles: [] })),
+      },
+    };
+    const payload = JSON.stringify(compact);
     atomic(() => {
       db.insert(schema.checkpoints)
-        .values({ id: "current", version: 2, payload: JSON.stringify(state) })
+        .values({ id: "current", version: 2, payload })
         .onConflictDoUpdate({
           target: schema.checkpoints.id,
-          set: { version: 2, payload: JSON.stringify(state) },
+          set: { version: 2, payload },
         })
         .run();
       sqlite.run("INSERT OR IGNORE INTO experiments VALUES (?,?,?)", [
@@ -156,7 +174,7 @@ export async function openDatabase(path: string) {
         stmt.free();
       }
       for (const a of state.trading.accounts)
-        sqlite.run("INSERT OR REPLACE INTO virtual_accounts VALUES (?,?,?,?)", [
+        writeRow("INSERT OR REPLACE INTO virtual_accounts VALUES (?,?,?,?)", [
           sid,
           a.id,
           a.cash,
@@ -169,7 +187,7 @@ export async function openDatabase(path: string) {
       ];
       for (const [table, rows] of entities)
         for (const row of rows)
-          sqlite.run(`INSERT OR REPLACE INTO ${table} VALUES (?,?,?,?)`, [
+          writeRow(`INSERT OR REPLACE INTO ${table} VALUES (?,?,?,?)`, [
             sid,
             row.id,
             row.accountId,
@@ -184,7 +202,7 @@ export async function openDatabase(path: string) {
           JSON.stringify(p),
         ]);
       for (const o of state.trading.orders)
-        sqlite.run("INSERT OR REPLACE INTO orders VALUES (?,?,?,?,?)", [
+        writeRow("INSERT OR REPLACE INTO orders VALUES (?,?,?,?,?)", [
           sid,
           o.id,
           o.accountId,
@@ -192,7 +210,7 @@ export async function openDatabase(path: string) {
           JSON.stringify(o),
         ]);
       for (const e of state.market.events)
-        sqlite.run("INSERT OR IGNORE INTO market_events VALUES (?,?,?,?)", [
+        writeRow("INSERT OR IGNORE INTO market_events VALUES (?,?,?,?)", [
           sid,
           e.id,
           e.time,
@@ -200,27 +218,25 @@ export async function openDatabase(path: string) {
         ]);
       for (const a of state.agents)
         for (const h of a.history)
-          sqlite.run("INSERT OR IGNORE INTO agent_history VALUES (?,?,?,?)", [
-            sid,
-            a.id,
-            h.id,
-            JSON.stringify(h),
-          ]);
+          writeRow(
+            "INSERT OR IGNORE INTO agent_history VALUES (?,?,?,?)",
+            [sid, a.id, h.id, JSON.stringify(h)],
+            3,
+          );
       for (const p of state.equity)
-        sqlite.run("INSERT OR REPLACE INTO equity_curve VALUES (?,?,?,?)", [
-          sid,
-          p.accountId,
-          p.time,
-          JSON.stringify(p),
-        ]);
+        writeRow(
+          "INSERT OR REPLACE INTO equity_curve VALUES (?,?,?,?)",
+          [sid, p.accountId, p.time, JSON.stringify(p)],
+          3,
+        );
       for (const b of state.backtests)
-        sqlite.run("INSERT OR REPLACE INTO backtest_results VALUES (?,?,?)", [
+        writeRow("INSERT OR REPLACE INTO backtest_results VALUES (?,?,?)", [
           sid,
           b.id,
           JSON.stringify(b),
         ]);
       for (const a of state.audit)
-        sqlite.run("INSERT OR IGNORE INTO admin_logs VALUES (?,?,?,?)", [
+        writeRow("INSERT OR IGNORE INTO admin_logs VALUES (?,?,?,?)", [
           a.id,
           sid,
           a.time,
@@ -272,6 +288,23 @@ export async function openDatabase(path: string) {
         !state.sessionId
       )
         throw Error("Checkpoint incompatível ou corrompido");
+      for (const q of state.market.quotes) {
+        if (!q.candles.length) {
+          const rows =
+            sqlite.exec(
+              "SELECT time,open,high,low,close,volume FROM (SELECT * FROM candles WHERE session_id=? AND symbol=? ORDER BY time DESC LIMIT 7200) ORDER BY time",
+              [state.sessionId, q.symbol],
+            )[0]?.values ?? [];
+          q.candles = rows.map((r) => ({
+            time: Number(r[0]),
+            open: Number(r[1]),
+            high: Number(r[2]),
+            low: Number(r[3]),
+            close: Number(r[4]),
+            volume: Number(r[5]),
+          }));
+        }
+      }
       return state;
     },
     saveState,

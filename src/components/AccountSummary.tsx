@@ -28,7 +28,17 @@ export function AccountSummary() {
       ].map(([label, value, detail]) => (
         <div className="stat" key={label}>
           <div>{label}</div>
-          <strong>{value}</strong>
+          <strong
+            className={
+              label.includes("P&L")
+                ? String(value).startsWith("-")
+                  ? "negative"
+                  : "positive"
+                : undefined
+            }
+          >
+            {value}
+          </strong>
           <small>{detail}</small>
         </div>
       ))}

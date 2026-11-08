@@ -79,7 +79,7 @@ export function MCP() {
             <p>Nenhuma ocorrência.</p>
           )}
           <p>
-            O MCP usa uma conta externa isolada. Não há ferramentas
+            O Claude opera na sua conta principal e no mesmo patrimônio virtual exibido no terminal. Não há ferramentas
             administrativas, acesso arbitrário a arquivos, comandos de terminal
             ou integrações financeiras reais.
           </p>

@@ -48,6 +48,7 @@ try {
   assert.ok((await page.locator("canvas").count()) > 0);
   for (const name of [
     "Mercados",
+    "Notícias",
     "Trading",
     "Agentes de IA",
     "Portfólio",
@@ -124,6 +125,25 @@ try {
   await page
     .getByRole("heading", { name: "Experimentos salvos", exact: true })
     .waitFor();
+  await page
+    .locator("nav")
+    .getByRole("button", { name: "Notícias", exact: true })
+    .click();
+  await page
+    .getByLabel("Texto que o Claude vai ler", { exact: true })
+    .fill("Nova legislação favorece pagamentos digitais.");
+  await page.getByLabel("Impacto (%)", { exact: true }).fill("2.5");
+  await page
+    .getByRole("button", {
+      name: "Publicar notícia e aplicar impacto",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByText("Notícia publicada. O impacto segue a programação escolhida.", {
+      exact: true,
+    })
+    .waitFor();
   // Teste STDIO usando o próprio executável Electron, usando o runtime Node embutido e o servidor distribuído.
   view = (await page.evaluate(() => window.marketLab.view())).data;
   const config = view.mcp.configuration.mcpServers["market-lab"];
@@ -151,8 +171,16 @@ try {
     transport.stderr?.on("data", (d) => process.stderr.write(d));
   client = new Client({ name: "desktop-e2e", version: "1" });
   await client.connect(transport);
+  const newsResult = await client.callTool({
+    name: "get_market_news",
+    arguments: {},
+  });
+  assert.equal(newsResult.isError, false);
+  const feed = newsResult.structuredContent.data;
+  assert.equal(feed[0].text, "Nova legislação favorece pagamentos digitais.");
+  assert.deepEqual(Object.keys(feed[0]), ["text"]);
   const tools = await client.listTools();
-  assert.ok(tools.tools.length >= 33);
+  assert.ok(tools.tools.length >= 35);
   const response = await client.callTool({
     name: "place_market_order",
     arguments: {
@@ -163,14 +191,19 @@ try {
     },
   });
   assert.equal(response.isError, false, JSON.stringify(response));
-  view = (await page.evaluate(() => window.marketLab.view())).data;
-  assert.ok(
-    view.agents.some(
-      (a) =>
-        a.id === "external" &&
-        a.portfolio.positions.some((p) => p.symbol === "ETH/USD"),
-    ),
+  const short = await client.callTool({
+    name: "open_short",
+    arguments: { requestId: "e2e-short", symbol: "SOL/USD", quantity: 1 },
+  });
+  assert.equal(short.isError, false, JSON.stringify(short));
+  const shared = (await page.evaluate(() => window.marketLab.view())).data;
+  assert.equal(
+    shared.portfolio.positions.find((p) => p.symbol === "SOL/USD").direction,
+    "short",
   );
+
+  view = (await page.evaluate(() => window.marketLab.view())).data;
+  assert.ok(view.portfolio.positions.some((p) => p.symbol === "ETH/USD"));
   await client.close();
   client = null;
   const orders = view.orders.length,
@@ -179,9 +212,11 @@ try {
     .locator("nav")
     .getByRole("button", { name: "Visão geral", exact: true })
     .click();
+  await page.getByLabel("Ativo", { exact: true }).selectOption("SOL/USD");
+  await page.waitForTimeout(900);
   mkdirSync("output", { recursive: true });
   await page.screenshot({
-    path: "output/market-lab-0.2.0.png",
+    path: "output/market-lab-0.2.1.png",
     fullPage: true,
   });
   await app.close();
