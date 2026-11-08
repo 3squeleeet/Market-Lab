@@ -1,4 +1,4 @@
-# Market Lab 0.2.0
+# Market Lab 0.2.1
 
 Aplicativo desktop local de **simulação** de trading de criptomoedas, com Electron, React, TypeScript, SQLite/Drizzle e MCP por STDIO. Não conecta corretoras, exchanges, carteiras ou dinheiro real.
 
@@ -6,9 +6,9 @@ Aplicativo desktop local de **simulação** de trading de criptomoedas, com Elec
 
 Abra [Releases](https://github.com/3squeleeet/Market-Lab/releases/latest).
 
-- **Market-Lab-0.2.0-Setup-x64.exe**: recomendado para conectar ao Claude; instala em um caminho estável, permite escolher a pasta e cria atalhos.
-- **Market-Lab-0.2.0-Windows-x64.zip**: aplicativo completo extraído em uma pasta fixa; abra `Market Lab.exe`. Também serve para MCP sem instalar Node.js.
-- **Market-Lab-0.2.0-Portable-x64.exe**: autoextraível para abrir rapidamente. O executável interno pode ficar em uma pasta temporária, portanto prefira o instalador ou ZIP para uma configuração MCP duradoura.
+- **Market-Lab-0.2.1-Setup-x64.exe**: recomendado para conectar ao Claude; instala em um caminho estável, permite escolher a pasta e cria atalhos.
+- **Market-Lab-0.2.1-Windows-x64.zip**: aplicativo completo extraído em uma pasta fixa; abra `Market Lab.exe`. Também serve para MCP sem instalar Node.js.
+- **Market-Lab-0.2.1-Portable-x64.exe**: autoextraível para abrir rapidamente. O executável interno pode ficar em uma pasta temporária, portanto prefira o instalador ou ZIP para uma configuração MCP duradoura.
 
 O "Source code / Download ZIP" do GitHub contém somente código-fonte. Nenhuma distribuição exige Node.js do usuário final. Os executáveis ainda não têm assinatura digital.
 
@@ -27,7 +27,7 @@ O "Source code / Download ZIP" do GitHub contém somente código-fonte. Nenhuma 
 - Backtests isolados de Buy and Hold, SMA 10/30 e RSI 14 (30/70), com capital, taxas, slippage e período próprios. Sinais usam candles anteriores e execução na abertura seguinte; liquidação no final.
 - Agentes locais: criar/editar, ativos autorizados, capital próprio, limite de exposição para novas ordens, estratégia, pausar/retomar/encerrar, histórico de decisões, operações e comparação de resultados. Decisões a cada 15 segundos simulados.
 - Painel de desenvolvimento separado, com confirmação: saldo, preço, volatilidade, regime, congelamento, eventos, seed, reinício e avanço do relógio. Tudo auditado; nenhuma dessas intervenções é exposta pelo MCP.
-- MCP oficial por STDIO com 33 ferramentas, lendo/escrevendo a instância local aberta por named pipe no Windows ou socket Unix autenticado. Nenhuma porta HTTP para MCP.
+- MCP oficial por STDIO com 35 ferramentas, lendo/escrevendo a instância local aberta por named pipe no Windows ou socket Unix autenticado. Nenhuma porta HTTP para MCP.
 - SQLite com migrations, checkpoints, candles históricos, contas, ordens, posições, execuções, agentes, backtests e auditoria. Operações financeiras persistem em transação antes de retornar sucesso; erros de gravação revertem o estado em memória.
 
 ## Instalar a partir do código
@@ -60,7 +60,7 @@ Gera instalador NSIS, portátil e ZIP em `release/`. Para gerar apenas o portát
 
 Veja [docs/MCP.md](docs/MCP.md). Instale/extraia o aplicativo em uma pasta fixa, abra **Conexões MCP** e copie o JSON gerado com os caminhos reais dessa instalação. Mantenha o Market Lab aberto. O processo MCP não abre um banco próprio nem inventa resultados quando a instância está indisponível.
 
-Claude usa uma conta `external` isolada, criada na primeira chamada MCP válida; não pode movimentar a conta principal nem agentes cadastrados pela interface. Agentes criados por MCP pertencem ao controlador MCP e têm limites e contas próprios. O usuário pode inspecionar e controlar todas as contas pela interface.
+Claude opera na **conta principal** por padrão, usando o mesmo patrimônio, saldo e posições exibidos no terminal. Não é criada outra conta para suas ordens. Contas de agentes permanecem independentes; contas MCP antigas são preservadas, sem transferência automática de saldos.
 
 Não há um modelo embutido nem exigência de API key para estratégias locais. A autenticação/assinatura do Claude pertence ao aplicativo Claude do usuário, não ao Market Lab.
 
@@ -103,7 +103,7 @@ Com Vite ativo, `npm run test:browser` usa Chromium (`CHROMIUM_PATH` se necessá
 
 ## Limites do modelo
 
-- Spot long-only, sem alavancagem, short, margem ou liquidação por empréstimo. Execuções são integrais, sem preenchimento parcial ou disputa por liquidez.
+- LONG e SHORT virtuais, com margem integral 1x nas posições vendidas. Não há alavancagem ou funding. Shorts têm liquidação automática quando a margem restante chega a 20%; gaps recebem proteção virtual para limitar a perda à margem, registrada como gapProtection no fechamento. Execuções são integrais, sem preenchimentos parciais.
 - O livro retornado por MCP é **indicativo e sintético**, derivado do spread/volume; não representa ordens de exchange. Ordens não alteram a trajetória do mercado.
 - SL/TP e ordens limitadas são avaliados nos ticks observados, sem inferir uma sequência intratick pelo high/low. Pode haver gaps.
 - Até 7.200 candles por ativo no gráfico em memória; o histórico completo da sessão permanece no SQLite. Consultas MCP limitam a resposta; backtests aceitam de 32 a 199.999 candles.
@@ -113,3 +113,11 @@ Com Vite ativo, `npm run test:browser` usa Chromium (`CHROMIUM_PATH` se necessá
 - A conexão foi validada por clientes do SDK oficial e pelo executável; não é possível configurar ou verificar o Claude instalado no computador do usuário a partir deste ambiente.
 
 Gráficos por [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/), Apache 2.0. Projeto sob MIT; veja LICENSE e as licenças das dependências.
+
+## Novidades 0.2.1
+
+- Tela **Notícias**: texto, ativo e impacto percentual positivo/negativo; atraso e duração em segundos simulados. O texto é publicado imediatamente; o impacto pode ser instantâneo, atrasado ou gradual. Pausa e velocidade afetam os prazos. O Claude recebe somente o texto por `get_market_news`; os parâmetros ficam privados e auditados. Oscilações naturais continuam durante impactos graduais.
+- `open_short` e `positionSide: "short"` nas ordens; cobertura por `close_position` ou compra com posição SHORT. Não é permitido manter LONG e SHORT simultâneos no mesmo ativo/conta.
+- Entradas, saídas e linhas de preço médio no gráfico, com identificação das execuções do Claude.
+- Atualização incremental de candles, menos tráfego IPC, séries do gráfico atualizadas por barra, checkpoints sem duplicar o histórico e cache de registros SQL inalterados. Mercado sem operações é salvo em lotes de até dois segundos; ordens confirmadas continuam duráveis imediatamente.
+- Tipografia maior, cards mais legíveis, tabelas com cabeçalho fixo e central visual de notícias.

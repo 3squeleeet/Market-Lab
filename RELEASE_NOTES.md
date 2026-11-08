@@ -1,19 +1,13 @@
-Market Lab 0.2.0 — Trading simulado + agentes + MCP local
+Market Lab 0.2.1 — desempenho, notícias e vendas a descoberto
 
-## Download Windows x64
+Baixe o **Setup-x64.exe** para instalar, ou o ZIP completo para extrair em uma pasta fixa. O Portable-x64.exe é para uso rápido; prefira instalação/ZIP para MCP duradouro.
 
-- **Market-Lab-0.2.0-Setup-x64.exe**: recomendado; instalador com caminho estável para Claude/MCP.
-- **Market-Lab-0.2.0-Windows-x64.zip**: aplicativo completo para extrair em uma pasta fixa, sem Node.js.
-- **Market-Lab-0.2.0-Portable-x64.exe**: autoextraível para uso rápido; prefira instalador/ZIP para MCP permanente.
+- Claude opera na conta principal e no seu patrimônio virtual.
+- LONG/SHORT com margem virtual 1x, cobertura, stop, alvo e liquidação; marcadores e linhas de entrada no gráfico.
+- Central de notícias: texto público, impacto privado com ativo, percentual, atraso e duração em tempo simulado. Claude lê somente o texto e interpreta o mercado.
+- Atualizações incrementais de gráficos e IPC; checkpoints compactos, salvamentos de mercado agrupados e cache SQL. Ordens continuam salvas antes de retornar sucesso.
+- Interface mais legível, tipografia maior e central visual de notícias.
 
-Abra Conexões MCP e copie a configuração com os caminhos reais da sua instalação. Mantenha o aplicativo aberto. Não há servidor HTTP, VPS, porta pública, API key obrigatória ou serviço remoto em runtime.
+Os saldos e posições existentes são preservados. Não é criada uma conta nova para as ordens do Claude; contas antigas não são fundidas automaticamente. O MCP permanece local por STDIO, sem Node.js externo e sem serviço hospedado.
 
-## Implementado
-
-Trading spot virtual a mercado/limite, reservas, taxas, slippage, posições dinâmicas, SL/TP, histórico e SQLite transacional com migrations. Análises e backtests isolados (Hold/SMA/RSI), agentes locais com contas/limites próprios, mod menu confirmado/auditado e 33 ferramentas MCP por STDIO usando SDK oficial e bridge local autenticado.
-
-O MCP usa conta externa isolada e não acessa a conta principal nem ferramentas administrativas. Todas as operações são sintéticas; não há carteiras, corretoras ou dinheiro real.
-
-O workflow testa TypeScript, núcleo/integração, interface Electron e MCP pelo próprio executável, incluindo a versão empacotada no Windows, antes de publicar os arquivos. Consulte VALIDACAO.md e docs/MCP.md para detalhes e limites.
-
-Os executáveis ainda não têm assinatura digital; o Windows pode mostrar editor desconhecido. Os arquivos Source code do GitHub são apenas o código-fonte.
+Tudo é simulado. Sem dinheiro real ou corretoras. Shorts não têm alavancagem; perdas por gaps são limitadas à margem virtual por proteção explícita, registrada no histórico. O instalador ainda não tem assinatura digital.

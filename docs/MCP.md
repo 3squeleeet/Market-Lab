@@ -2,7 +2,7 @@
 
 ## Windows — recomendado
 
-1. Instale `Market-Lab-0.2.0-Setup-x64.exe` ou extraia o ZIP completo em uma pasta fixa. No ZIP, o executável é `Market Lab.exe`, ao lado da pasta `resources`.
+1. Instale `Market-Lab-0.2.1-Setup-x64.exe` ou extraia o ZIP completo em uma pasta fixa. No ZIP, o executável é `Market Lab.exe`, ao lado da pasta `resources`.
 2. Abra o Market Lab e a página **Conexões MCP**.
 3. Copie o JSON completo gerado pelo aplicativo. `command` usa o caminho absoluto real do executável em execução; os argumentos incluem o servidor empacotado, `--discovery` e o arquivo real de descoberta dessa instalação. O bloco `env` ativa o runtime Node já incluído no Electron. Não há caminhos fictícios que você precise adivinhar.
 4. Deixe o Market Lab aberto enquanto usa as ferramentas.
@@ -43,7 +43,7 @@ Depois peça, por exemplo:
 
 > Consulte o estado da simulação, o preço sintético de BTC/USD e o saldo da minha conta MCP. Compre virtualmente 0,001 BTC usando um requestId único. Consulte a posição e as taxas. Não use dinheiro real.
 
-As ferramentas MCP usam a conta externa isolada; essa compra não aparece na conta principal. Veja a conta Claude/MCP em Agentes de IA ou selecione-a em Trading.
+As ferramentas MCP usam sua conta principal. Compras, vendas e shorts alteram o patrimônio que você vê em Visão geral e Portfólio. Para abrir vendido, use `open_short` com ativo, quantidade e requestId; para cobrir, `close_position`. As execuções aparecem no gráfico do ativo.
 
 ## Código-fonte — gerador de configuração com caminhos existentes
 
@@ -75,25 +75,29 @@ Sem instância aberta, o servidor continua respondendo ao protocolo MCP, mas as 
 
 O painel mostra disponibilidade local, clientes com heartbeat recente, versão do protocolo, ferramentas e logs. Disponibilidade local não significa Claude conectado. Clientes inativos expiram em 30 segundos.
 
-O MCP cria/usa `external` com US$100.000 virtuais e só pode acessar essa conta e agentes criados por MCP. Não pode acessar contas principais/agentes locais, alterar saldos/preços/seed, executar comandos de terminal nem ler caminhos recebidos do modelo. O usuário continua podendo controlar e inspecionar os agentes pela interface.
+O MCP usa `main` por padrão e pode operar essa conta principal, conforme solicitado pelo usuário. Contas de agentes locais continuam protegidas; agentes criados por MCP continuam com contas próprias. O MCP não pode alterar saldos, preços, seed, publicar notícias ou consultar sua configuração privada. Contas `external` de versões anteriores são preservadas como histórico; não são fundidas com a principal.
 
-## Ferramentas (33)
+## Ferramentas (35)
 
-| Grupo     | Ferramentas                                                                                                    |
-| --------- | -------------------------------------------------------------------------------------------------------------- |
-| Mercado   | get_market_overview, get_asset_price, get_market_candles, get_order_book, get_market_regime, get_market_events |
-| Conta     | get_account_balance, get_portfolio, get_open_positions, get_trade_history, get_order_history                   |
-| Trading   | place_market_order, place_limit_order, cancel_order, close_position, set_stop_loss, set_take_profit            |
-| Agentes   | list_agents, create_agent, pause_agent, resume_agent, get_agent_performance, get_agent_history                 |
-| Simulação | get_simulation_status, pause_simulation, resume_simulation, set_simulation_speed, get_simulation_configuration |
-| Análises  | get_performance_metrics, get_asset_performance, get_equity_curve, run_backtest, get_backtest_results           |
+| Grupo     | Ferramentas                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Mercado   | get_market_news, get_market_overview, get_asset_price, get_market_candles, get_order_book, get_market_regime, get_market_events |
+| Conta     | get_account_balance, get_portfolio, get_open_positions, get_trade_history, get_order_history                                    |
+| Trading   | open_short, place_market_order, place_limit_order, cancel_order, close_position, set_stop_loss, set_take_profit                 |
+| Agentes   | list_agents, create_agent, pause_agent, resume_agent, get_agent_performance, get_agent_history                                  |
+| Simulação | get_simulation_status, pause_simulation, resume_simulation, set_simulation_speed, get_simulation_configuration                  |
+| Análises  | get_performance_metrics, get_asset_performance, get_equity_curve, run_backtest, get_backtest_results                            |
 
 `requestId` deve ser único por conta e intenção; repetir uma ordem idêntica não a executa duas vezes. Alterar os dados mantendo o mesmo ID gera conflito. Quantidade mínima: 0,00000001 unidade. Taxas/slippage/spread são em pontos-base (10 bps = 0,1%). Símbolos incluem `/USD`. Datas são segundos Unix do relógio sintético UTC.
 
-Stops/targets aceitam `price` absoluto ou `percent` da entrada, sem os dois simultaneamente. `price: null` remove a proteção. Operações são spot long-only. Ordens limitadas reservam capital/inventário e respeitam seu preço limite.
+Stops/targets aceitam `price` absoluto ou `percent` da entrada, sem os dois simultaneamente. `price: null` remove a proteção. Operações suportam LONG e SHORT com margem virtual 1x. Ordens limitadas reservam capital/inventário e respeitam seu preço limite.
 
 O servidor usa o SDK oficial `@modelcontextprotocol/sdk`. Foram testados negociação/listagem/chamada de ferramentas por STDIO, validação, conta isolada, estado real, reconexão e indisponibilidade; a configuração do Claude do usuário deve ser feita no próprio computador.
 
 ## Processo sem janela
 
 A distribuição contém `resources/mcp/server.cjs`, com SDK e dependências empacotados. O JSON usa o próprio `Market Lab.exe` com `ELECTRON_RUN_AS_NODE=1` para executar esse servidor sem janela e sem depender de um Node instalado. O aplicativo gráfico continua como único proprietário dos motores e do banco. Não remova o bloco `env` da configuração.
+
+## Notícias privadas e interpretação
+
+`get_market_news` retorna somente objetos com `text`. O percentual, o ativo impactado, o atraso e a duração não são retornados. O Claude pode consultar preços e candles normalmente e interpretar o efeito observado, mas não publicar notícias nem ler o log administrativo.

@@ -14,10 +14,14 @@ export function LinePlot({
   const min = Math.min(...values),
     max = Math.max(...values),
     range = max - min || 1;
-  const points = values
+  const stride = Math.max(1, Math.ceil(values.length / 350));
+  const sampled = values.filter(
+    (_, i) => i % stride === 0 || i === values.length - 1,
+  );
+  const points = sampled
     .map(
       (n, i) =>
-        `${(i / (values.length - 1)) * 900},${170 - ((n - min) / range) * 145}`,
+        `${(i / (sampled.length - 1)) * 900},${170 - ((n - min) / range) * 145}`,
     )
     .join(" ");
   return (

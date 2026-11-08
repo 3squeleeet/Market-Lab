@@ -80,11 +80,11 @@ describe("serviços persistidos", () => {
       "encerrado",
     );
   });
-  it("MCP só controla contas e agentes da própria origem", () => {
+  it("MCP opera o patrimônio principal e preserva isolamento dos agentes locais", () => {
     lab.execute("get_account_balance", {}, "mcp");
-    expect(() =>
-      lab.execute("get_portfolio", { accountId: "main" }, "mcp"),
-    ).toThrow("principal");
+    expect(
+      (lab.execute("get_portfolio", {}, "mcp") as Portfolio).account.id,
+    ).toBe("main");
     const a = lab.execute("create_agent", {
       name: "Local",
       assets: ["BTC/USD"],
@@ -114,8 +114,8 @@ describe("serviços persistidos", () => {
       { requestId: "mcp", symbol: "BTC/USD", side: "buy", quantity: 0.01 },
       "mcp",
     );
-    expect(lab.trading.position("external", "BTC/USD")).toBeDefined();
-    expect(lab.trading.account("main").cash).toBe(100000);
+    expect(lab.trading.position("main", "BTC/USD")).toBeDefined();
+    expect(lab.trading.account("main").cash).toBeLessThan(100000);
   });
   it("intervenções exigem confirmação, são auditadas e reset arquiva candles", () => {
     expect(() =>
@@ -240,4 +240,63 @@ it("avanços maiores que o buffer do gráfico não descartam candles do históri
   expect(lab.market.quotes[0].candles).toHaveLength(7200);
   expect(history).toHaveLength(10900);
   expect(history.every((c, i) => c.time === 1735689601 + i)).toBe(true);
+});
+
+it("notícia aplica impacto e MCP só recebe texto público, sem configuração privada", () => {
+  const before = lab.market.quotes[0].price;
+  const text = "Instituições anunciam adoção de pagamentos digitais.";
+  lab.execute("publish_news", { text, symbol: "BTC/USD", percent: 12 });
+  expect(lab.market.quotes[0].price).toBeCloseTo(before * 1.12);
+  const publicNews = lab.execute("get_market_news", {}, "mcp") as {
+    text: string;
+  }[];
+  expect(publicNews[0].text).toBe(text);
+  expect(Object.keys(publicNews[0]).sort()).toEqual(["text"]);
+  expect(() =>
+    lab.execute(
+      "publish_news",
+      { text: "x", symbol: "BTC/USD", percent: -10 },
+      "mcp",
+    ),
+  ).toThrow("administrativa");
+  expect(db.loadState()?.news?.[0].text).toBe(text);
+  expect(lab.market.quotes[0].candles.at(-1)?.close).toBeCloseTo(before * 1.12);
+});
+it("delta de tela é pequeno e checkpoint compacto restaura todo o histórico", () => {
+  const full = lab.view("BTC/USD"),
+    bytes = JSON.stringify(full).length;
+  lab.advanceRealtime(1);
+  const delta = lab.view("BTC/USD", {
+    sessionId: lab.state.sessionId,
+    since: full.market.time,
+    page: "Visão geral",
+  });
+  expect(JSON.stringify(delta).length).toBeLessThan(bytes / 4);
+  lab.commit();
+  expect(db.loadState()?.market.quotes[0].candles).toHaveLength(3601);
+});
+
+it("notícia aguarda o relógio simulado e aplica percentual gradual após reiniciar", async () => {
+  lab.state.simulation.frozen = true;
+  const before = lab.market.quotes[0].price;
+  lab.execute("publish_news", {
+    text: "Publicação com efeito futuro.",
+    symbol: "BTC/USD",
+    percent: -20,
+    delaySeconds: 2,
+    durationSeconds: 3,
+  });
+  lab.advance(2);
+  expect(lab.market.quotes[0].price).toBe(before);
+  lab.advance(1);
+  expect(lab.market.quotes[0].price).toBeCloseTo(before * Math.pow(0.8, 1 / 3));
+  db.close();
+  db = await openDatabase(join(dir, "lab.sqlite"));
+  lab = new LabService(db);
+  lab.advance(2);
+  expect(lab.market.quotes[0].price).toBeCloseTo(before * 0.8);
+  expect(lab.view().newsSchedule[0].status).toBe("completed");
+  expect(lab.execute("get_market_news", {}, "mcp")).toEqual([
+    { text: "Publicação com efeito futuro." },
+  ]);
 });

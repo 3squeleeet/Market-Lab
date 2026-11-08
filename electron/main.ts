@@ -100,13 +100,26 @@ if (!app.requestSingleInstanceLock()) {
         [mcpScript],
         { ELECTRON_RUN_AS_NODE: "1" },
       );
-      ipcMain.handle("lab:view", (e, symbol: unknown) =>
-        reply(() => {
-          authorized(e);
-          if (symbol !== undefined && !SYMBOLS.includes(symbol as Symbol))
-            throw Error("Ativo inválido");
-          return service.view(symbol as Symbol | undefined);
-        }),
+      ipcMain.handle(
+        "lab:view",
+        (
+          e,
+          symbol: unknown,
+          options?: { sessionId?: string; since?: number; page?: string },
+        ) =>
+          reply(() => {
+            authorized(e);
+            if (symbol !== undefined && !SYMBOLS.includes(symbol as Symbol))
+              throw Error("Ativo inválido");
+            if (
+              options &&
+              (typeof options !== "object" ||
+                (options.since !== undefined &&
+                  !Number.isSafeInteger(options.since)))
+            )
+              throw Error("Consulta inválida");
+            return service.view(symbol as Symbol | undefined, options);
+          }),
       );
       ipcMain.handle("lab:invoke", (e, name: unknown, args: unknown) =>
         reply(() => {
@@ -128,7 +141,7 @@ if (!app.requestSingleInstanceLock()) {
         const ticks = clock.consume(elapsed, 250);
         if (ticks > 0) {
           try {
-            service.advance(ticks);
+            service.advanceRealtime(ticks);
           } catch (e) {
             service.state.simulation.running = false;
             dialog.showErrorBox(

@@ -11,10 +11,10 @@ import { bridgeRequest } from "./bridge.js";
 export async function startMCP(discoveryPath: string) {
   const sessionId = randomUUID(),
     server = new McpServer(
-      { name: "market-lab", version: "0.2.0" },
+      { name: "market-lab", version: "0.2.1" },
       {
         instructions:
-          "Simulador local. Todos os preços, saldos e ordens são virtuais. O aplicativo deve estar aberto. A conta MCP é isolada da conta principal e só pode controlar seus próprios agentes. Ferramentas não administrativas, sem acesso a arquivos/comandos ou corretoras. Datas em segundos UTC do relógio sintético.",
+          "Simulador local. Todos os preços, saldos e ordens são virtuais. O aplicativo deve estar aberto. Ordens e consultas usam a conta principal e seu patrimônio virtual por padrão. Contas de agentes continuam separadas. Ferramentas não administrativas, sem acesso a arquivos/comandos ou corretoras. Datas em segundos UTC do relógio sintético.",
       },
     );
   for (const name of MCP_TOOLS) {

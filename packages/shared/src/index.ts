@@ -68,6 +68,8 @@ export interface Account {
   maxDrawdown?: number;
 }
 export interface Position {
+  direction?: "long" | "short";
+  collateral?: number;
   id: string;
   accountId: string;
   symbol: Symbol;
@@ -79,6 +81,8 @@ export interface Position {
   takeProfit: number | null;
 }
 export interface ClosedPosition {
+  direction?: "long" | "short";
+  gapProtection?: number;
   id: string;
   positionId: string;
   accountId: string;
@@ -92,6 +96,8 @@ export interface ClosedPosition {
   reason: string;
 }
 export interface Order {
+  positionSide?: "long" | "short";
+  source?: "ui" | "mcp" | "agent" | "risk";
   id: string;
   requestId: string;
   accountId: string;
@@ -229,7 +235,25 @@ export interface SimulationConfig {
   theme: "dark";
   chartInterval: number;
 }
+export interface NewsItem {
+  id: string;
+  time: number;
+  text: string;
+}
+export interface NewsImpact {
+  newsId: string;
+  symbol: Symbol;
+  percent: number;
+  startTime: number;
+  durationSeconds: number;
+  appliedSteps: number;
+  totalSteps: number;
+  logStep: number;
+  status: "pending" | "active" | "completed";
+}
 export interface LabState {
+  newsImpacts?: NewsImpact[];
+  news?: NewsItem[];
   version: 2;
   sessionId: string;
   market: MarketState;
@@ -252,6 +276,8 @@ export interface MCPStatus {
   logs: { time: number; message: string }[];
 }
 export interface LabView {
+  newsSchedule: NewsImpact[];
+  news: NewsItem[];
   version: string;
   sessionId: string;
   market: {
@@ -283,7 +309,10 @@ export type Reply<T = unknown> =
   | { ok: false; error: { code: string; message: string } };
 export interface DesktopAPI {
   invoke(name: string, args?: Record<string, unknown>): Promise<Reply>;
-  view(symbol?: Symbol): Promise<Reply<LabView>>;
+  view(
+    symbol?: Symbol,
+    options?: { sessionId?: string; since?: number; page?: string },
+  ): Promise<Reply<LabView>>;
 }
 export interface SavedSession {
   version: 1;

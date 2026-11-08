@@ -36,7 +36,7 @@ export function PositionPanels({ accountId = "main" }: { accountId?: string }) {
             "Ações",
           ]}
           rows={(portfolio?.positions ?? []).map((p) => [
-            p.symbol,
+            `${p.symbol} · ${p.direction === "short" ? "SHORT" : "LONG"}`,
             p.quantity.toPrecision(8),
             money(p.averagePrice),
             money(p.currentPrice),

@@ -31,9 +31,9 @@ try {
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.exposeFunction("__labView", (symbol) => ({
+  await page.exposeFunction("__labView", (symbol, options) => ({
     ok: true,
-    data: service.view(symbol),
+    data: service.view(symbol, options),
   }));
   await page.exposeFunction("__labInvoke", (name, args) => {
     try {
@@ -44,7 +44,7 @@ try {
   });
   await page.addInitScript(() => {
     window.marketLab = {
-      view: (symbol) => window.__labView(symbol),
+      view: (symbol, options) => window.__labView(symbol, options),
       invoke: (name, args) => window.__labInvoke(name, args),
     };
   });

@@ -26,6 +26,7 @@ const risk = z
   );
 const order = {
   ...base,
+  positionSide: z.enum(["long", "short"]).default("long"),
   requestId: id,
   symbol,
   side: z.enum(["buy", "sell"]),
@@ -40,6 +41,25 @@ const candleRange = {
   limit: z.number().int().min(1).max(20000).default(7200),
 };
 export const schemas = {
+  open_short: z
+    .object({
+      ...order,
+      side: z.literal("sell").default("sell"),
+      positionSide: z.literal("short").default("short"),
+    })
+    .strict(),
+  get_market_news: z
+    .object({ limit: z.number().int().min(1).max(100).default(20) })
+    .strict(),
+  publish_news: z
+    .object({
+      text: z.string().trim().min(1).max(10000),
+      symbol,
+      percent: finite.min(-99).max(1000),
+      delaySeconds: finite.int().min(0).max(604800).default(0),
+      durationSeconds: finite.int().min(0).max(86400).default(0),
+    })
+    .strict(),
   get_market_overview: empty,
   get_asset_price: z.object({ symbol }).strict(),
   get_market_candles: z.object(candleRange).strict(),
@@ -181,9 +201,11 @@ export const MCP_TOOLS = (Object.keys(schemas) as ToolName[]).filter(
       "stop_agent",
       "get_mcp_status",
       "update_agent",
+      "publish_news",
     ].includes(n),
 );
 export const READ_ONLY = new Set<ToolName>([
+  "get_market_news",
   "get_market_overview",
   "get_asset_price",
   "get_market_candles",
@@ -208,10 +230,14 @@ export const READ_ONLY = new Set<ToolName>([
   "get_mcp_status",
 ]);
 export const descriptions: Partial<Record<ToolName, string>> = {
+  open_short:
+    "Abre venda a descoberto virtual na conta principal, com margem 1x. Lucra na queda; use close_position para recomprar/cobrir. Não pode coexistir com LONG no mesmo ativo.",
+  get_market_news:
+    "Lê somente o texto público das notícias escritas pelo usuário. Impactos privados não são fornecidos: interprete o texto e observe o mercado.",
   get_order_book:
     "Livro SINTÉTICO indicativo derivado do spread; não representa ordens de uma exchange.",
   place_market_order:
-    "Executa compra/venda exclusivamente virtual com spread, slippage e taxa. requestId garante idempotência; MCP usa conta externa isolada.",
+    "Executa compra/venda exclusivamente virtual com spread, slippage e taxa. requestId garante idempotência; MCP usa a conta principal por padrão. Para abrir vendido: side=sell, positionSide=short; para cobrir: side=buy, positionSide=short. Margem virtual 1x.",
   place_limit_order:
     "Reserva saldo/quantidade e mantém ordem virtual até o bid/ask atingir o limite. Nunca executa além do preço limite.",
   run_backtest:

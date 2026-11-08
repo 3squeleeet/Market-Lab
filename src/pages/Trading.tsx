@@ -8,6 +8,7 @@ export function Trading() {
     d = s.data!;
   const [accountId, setAccount] = useState("main"),
     [side, setSide] = useState("buy"),
+    [direction, setDirection] = useState("long"),
     [type, setType] = useState("market"),
     [quantity, setQuantity] = useState("0.01"),
     [limit, setLimit] = useState(""),
@@ -34,24 +35,27 @@ export function Trading() {
     const reference = type === "limit" ? Number(limit) : q.price;
     const params: Record<string, unknown> = {
       accountId,
+      positionSide: direction,
       requestId,
       symbol: s.symbol,
       side,
       quantity: Number(quantity),
       ...(type === "limit" ? { price: Number(limit) } : {}),
-      ...(side === "buy" && sl
+      ...((direction === "short" ? side === "sell" : side === "buy") && sl
         ? {
             stopLoss:
               riskMode === "percent"
-                ? reference * (1 - Number(sl) / 100)
+                ? reference *
+                  (1 + ((direction === "short" ? 1 : -1) * Number(sl)) / 100)
                 : Number(sl),
           }
         : {}),
-      ...(side === "buy" && tp
+      ...((direction === "short" ? side === "sell" : side === "buy") && tp
         ? {
             takeProfit:
               riskMode === "percent"
-                ? reference * (1 + Number(tp) / 100)
+                ? reference *
+                  (1 + ((direction === "short" ? -1 : 1) * Number(tp)) / 100)
                 : Number(tp),
           }
         : {}),
@@ -110,14 +114,36 @@ export function Trading() {
             </select>
           </label>
           <label>
+            Posição
+            <select
+              aria-label="Posição"
+              value={direction}
+              onChange={(e) => {
+                setDirection(e.target.value);
+                setSide(e.target.value === "short" ? "sell" : "buy");
+              }}
+            >
+              <option value="long">LONG · comprado</option>
+              <option value="short">SHORT · vendido (margem 1x)</option>
+            </select>
+          </label>
+          <label>
             Lado
             <select
               aria-label="Lado"
               value={side}
               onChange={(e) => setSide(e.target.value)}
             >
-              <option value="buy">Compra</option>
-              <option value="sell">Venda</option>
+              <option value="buy">
+                {direction === "short"
+                  ? "Comprar para cobrir"
+                  : "Comprar / aumentar"}
+              </option>
+              <option value="sell">
+                {direction === "short"
+                  ? "Vender a descoberto"
+                  : "Vender / reduzir"}
+              </option>
             </select>
           </label>
           <label>
@@ -155,7 +181,7 @@ export function Trading() {
               />
             </label>
           )}
-          {side === "buy" && (
+          {(direction === "short" ? side === "sell" : side === "buy") && (
             <>
               <label>
                 Proteções
